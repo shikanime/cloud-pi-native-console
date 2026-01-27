@@ -6,7 +6,7 @@ import {
   listRoles as listRolesQuery,
   updateRole,
 } from '@/resources/queries-index.js'
-import { BadRequest400 } from '@/utils/errors.js'
+import { BadRequest400, Forbidden403, NotFound404 } from '@/utils/errors.js'
 import prisma from '@/prisma.js'
 
 export async function listRoles(projectId: Project['id']) {
@@ -24,6 +24,9 @@ export async function patchRoles(projectId: Project['id'], roles: typeof project
       const matchingRole = roles.find(role => role.id === dbRole.id)
       if (typeof matchingRole?.position !== 'undefined' && !positionsAvailable.includes(matchingRole.position)) {
         positionsAvailable.push(matchingRole.position)
+      }
+      if (['Administrateur', 'DevOps', 'Développer', 'Lecture seule'].includes(dbRole.name) && matchingRole?.name !== dbRole.name) {
+        throw new Forbidden403('Ce rôle système ne peut pas être renommé')
       }
       return {
         id: matchingRole?.id ?? dbRole.id,
@@ -73,6 +76,13 @@ export async function countRolesMembers(projectId: Project['id']) {
 }
 
 export async function deleteRole(roleId: Project['id']) {
+  const role = await prisma.projectRole.findUnique({
+    where: { id: roleId },
+  })
+  if (!role) throw new NotFound404()
+  if (['Administrateur', 'DevOps', 'Développer', 'Lecture seule', 'security'].includes(role.name)) {
+    throw new Forbidden403('Ce rôle système ne peut pas être supprimé')
+  }
   await deleteRoleQuery(roleId)
   return null
 }
