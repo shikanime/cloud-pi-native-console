@@ -2,7 +2,7 @@ import { faker } from '@faker-js/faker'
 import { describe, expect, it } from 'vitest'
 import type { ProjectMembers, ProjectRole, User } from '@prisma/client'
 import prisma from '../../__mocks__/prisma.js'
-import { BadRequest400 } from '../../utils/errors.ts'
+import { BadRequest400, Forbidden403 } from '../../utils/errors.ts'
 import { countRolesMembers, createRole, deleteRole, listRoles, patchRoles } from './business.ts'
 
 const projectId = faker.string.uuid()
@@ -13,7 +13,7 @@ describe('test project-role business', () => {
         permissions: 4n,
       }
 
-      prisma.projectRole.findMany.mockResolvedValueOnce([partialRole])
+      prisma.projectRole.findMany.mockResolvedValueOnce([partialRole as ProjectRole])
       const response = await listRoles(projectId)
       expect(response).toEqual([{ permissions: '4' }])
     })
@@ -27,9 +27,9 @@ describe('test project-role business', () => {
         position: 0,
       }
 
-      prisma.projectRole.findFirst.mockResolvedValueOnce(dbRole)
-      prisma.projectRole.findMany.mockResolvedValueOnce([dbRole])
-      prisma.projectRole.create.mockResolvedValue(null)
+      prisma.projectRole.findFirst.mockResolvedValueOnce(dbRole as ProjectRole)
+      prisma.projectRole.findMany.mockResolvedValueOnce([dbRole as ProjectRole])
+      prisma.projectRole.create.mockResolvedValue(null as any)
       await createRole(projectId, { name: 'test', permissions: '4' })
 
       expect(prisma.projectRole.create).toHaveBeenCalledWith({ data: { name: 'test', permissions: 4n, position: 1, projectId } })
@@ -41,9 +41,9 @@ describe('test project-role business', () => {
         position: 50,
       }
 
-      prisma.projectRole.findFirst.mockResolvedValueOnce(dbRole)
-      prisma.projectRole.findMany.mockResolvedValueOnce([dbRole])
-      prisma.projectRole.create.mockResolvedValue(null)
+      prisma.projectRole.findFirst.mockResolvedValueOnce(dbRole as ProjectRole)
+      prisma.projectRole.findMany.mockResolvedValueOnce([dbRole as ProjectRole])
+      prisma.projectRole.create.mockResolvedValue(null as any)
       await createRole(projectId, { name: 'test', permissions: '4' })
 
       expect(prisma.projectRole.create).toHaveBeenCalledWith({ data: { name: 'test', permissions: 4n, position: 51, projectId } })
@@ -56,8 +56,8 @@ describe('test project-role business', () => {
       }
 
       prisma.projectRole.findFirst.mockResolvedValueOnce(undefined)
-      prisma.projectRole.findMany.mockResolvedValueOnce([dbRole])
-      prisma.projectRole.create.mockResolvedValue(null)
+      prisma.projectRole.findMany.mockResolvedValueOnce([dbRole as ProjectRole])
+      prisma.projectRole.create.mockResolvedValue(null as any)
       await createRole(projectId, { name: 'test', permissions: '4' })
 
       expect(prisma.projectRole.create).toHaveBeenCalledWith({ data: { name: 'test', permissions: 4n, position: 0, projectId } })
@@ -70,7 +70,8 @@ describe('test project-role business', () => {
       const dbRole: Partial<ProjectRole> = {
         permissions: 4n,
         position: 50,
-        id: faker.string.uuid(),
+        id: roleId,
+        name: 'custom-role',
       }
       const members = [{
         userId: faker.string.uuid(),
@@ -82,14 +83,37 @@ describe('test project-role business', () => {
         roleIds: [roleId, faker.string.uuid()],
       }] as const satisfies Partial<ProjectMembers>[]
 
+      prisma.projectRole.findUnique.mockResolvedValueOnce(dbRole as ProjectRole)
       prisma.projectMembers.findMany.mockResolvedValueOnce(members)
       prisma.projectRole.findMany.mockResolvedValueOnce([])
-      prisma.projectRole.delete.mockResolvedValue(dbRole)
+      prisma.projectRole.delete.mockResolvedValue(dbRole as ProjectRole)
       await deleteRole(roleId)
 
       expect(prisma.projectMembers.update).toHaveBeenNthCalledWith(1, { where: expect.any(Object), data: { roleIds: { set: [] } } })
       expect(prisma.projectMembers.update).toHaveBeenNthCalledWith(2, { where: expect.any(Object), data: { roleIds: { set: [members[1].roleIds[1]] } } })
       expect(prisma.projectRole.delete).toHaveBeenCalledWith({ where: { id: roleId } })
+    })
+
+    it('should throw Forbidden403 when deleting a system role', async () => {
+      const dbRole: Partial<ProjectRole> = {
+        name: 'Administrateur',
+        id: roleId,
+      }
+      prisma.projectRole.findUnique.mockResolvedValueOnce(dbRole as ProjectRole)
+
+      await expect(deleteRole(roleId)).rejects.toThrow(Forbidden403)
+      expect(prisma.projectRole.delete).not.toHaveBeenCalled()
+    })
+
+    it('should throw Forbidden403 when deleting the security role', async () => {
+      const dbRole: Partial<ProjectRole> = {
+        name: 'security',
+        id: roleId,
+      }
+      prisma.projectRole.findUnique.mockResolvedValueOnce(dbRole as ProjectRole)
+
+      await expect(deleteRole(roleId)).rejects.toThrow(Forbidden403)
+      expect(prisma.projectRole.delete).not.toHaveBeenCalled()
     })
   })
   describe.skip('countRolesMembers', () => {
@@ -120,13 +144,35 @@ describe('test project-role business', () => {
       permissions: faker.number.bigInt({ min: 0n, max: 50000n }),
       position: 0,
       projectId,
+      oidcGroup: 'group1',
     }, {
       id: faker.string.uuid(),
       name: faker.company.name(),
       permissions: faker.number.bigInt({ min: 0n, max: 50000n }),
       position: 1,
       projectId,
+      oidcGroup: 'group2',
     }]
+
+    it('should throw Forbidden403 when renaming a system role', async () => {
+      const systemRole: ProjectRole = {
+        id: faker.string.uuid(),
+        name: 'Administrateur',
+        permissions: 10n,
+        position: 0,
+        projectId,
+        oidcGroup: 'admin-group',
+      }
+      prisma.projectRole.findMany.mockResolvedValue([systemRole])
+
+      const updateRoles = [{
+        id: systemRole.id,
+        name: 'New Admin Name',
+      }]
+
+      await expect(patchRoles(projectId, updateRoles)).rejects.toThrow(Forbidden403)
+      expect(prisma.projectRole.update).toHaveBeenCalledTimes(0)
+    })
 
     it('should do nothing', async () => {
       prisma.projectRole.findMany.mockResolvedValue([])
