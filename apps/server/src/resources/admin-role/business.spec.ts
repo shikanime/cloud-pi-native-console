@@ -14,11 +14,12 @@ describe('test admin-role business', () => {
         permissions: 4n,
         position: 0,
         oidcGroup: '',
+        type: 'custom',
       }
 
       prisma.adminRole.findMany.mockResolvedValueOnce([role])
       const response = await listRoles()
-      expect(response).toContainEqual(expect.objectContaining({ permissions: '4' }))
+      expect(response).toContainEqual(expect.objectContaining({ permissions: '4', type: 'custom' }))
     })
   })
 
