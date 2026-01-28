@@ -4,7 +4,7 @@ import {
   listAdminRoles,
 } from '@/resources/queries-index.js'
 import type { ErrorResType } from '@/utils/errors.js'
-import { BadRequest400 } from '@/utils/errors.js'
+import { BadRequest400, Forbidden403, NotFound404 } from '@/utils/errors.js'
 import prisma from '@/prisma.js'
 
 export async function listRoles() {
@@ -23,12 +23,16 @@ export async function patchRoles(roles: typeof adminRoleContract.patchAdminRoles
       if (typeof matchingRole?.position !== 'undefined' && !positionsAvailable.includes(matchingRole.position)) {
         positionsAvailable.push(matchingRole.position)
       }
+      if (dbRole.type === 'system' && matchingRole?.name !== dbRole.name) {
+        throw new Forbidden403('Ce rôle système ne peut pas être renommé')
+      }
       return {
         id: dbRole.id,
         name: matchingRole?.name ?? dbRole.name,
         permissions: matchingRole?.permissions ? BigInt(matchingRole?.permissions) : dbRole.permissions,
         position: matchingRole?.position ?? dbRole.position,
         oidcGroup: matchingRole?.oidcGroup ?? dbRole.oidcGroup,
+        type: dbRole.type,
       }
     })
 
@@ -74,6 +78,12 @@ export async function countRolesMembers() {
 }
 
 export async function deleteRole(roleId: Project['id']) {
+  const role = await prisma.adminRole.findUnique({ where: { id: roleId } })
+  if (!role) throw new NotFound404()
+  if (role.type === 'system') {
+    throw new Forbidden403('Ce rôle système ne peut pas être supprimé')
+  }
+
   const allUsers = await prisma.user.findMany({
     where: {
       adminRoleIds: { has: roleId },
