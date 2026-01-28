@@ -70,7 +70,7 @@ function updateChecked(checked: boolean, value: bigint) {
         data-testid="roleNameInput"
         label-visible
         class="mb-5"
-        :disabled="role.isEveryone"
+        :disabled="role.isEveryone || role.type === 'system'"
       />
       <h6>Groupe OIDC</h6>
       <DsfrInput
