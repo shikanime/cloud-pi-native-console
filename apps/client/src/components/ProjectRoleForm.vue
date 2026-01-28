@@ -77,7 +77,7 @@ function updateChecked(checked: boolean, value: bigint) {
         data-testid="roleOidcGroupInput"
         label-visible
         class="mb-5"
-        :disabled="role.isEveryone"
+        :disabled="role.isEveryone || role.type === 'system'"
       />
       <h6>Permissions</h6>
       <div
@@ -98,7 +98,7 @@ function updateChecked(checked: boolean, value: bigint) {
           :label="perm?.label"
           :hint="perm?.hint"
           :name="perm.key"
-          :disabled="role.permissions & PROJECT_PERMS.MANAGE && perm.key !== 'MANAGE'"
+          :disabled="(role.permissions & PROJECT_PERMS.MANAGE && perm.key !== 'MANAGE') || role.type === 'system'"
           @update:model-value="(checked: boolean) => updateChecked(checked, PROJECT_PERMS[perm.key])"
         />
       </div>

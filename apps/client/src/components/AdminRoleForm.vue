@@ -176,6 +176,7 @@ function closeModal() {
         label-visible
         placeholder="/admin"
         class="mb-5"
+        :disabled="role.type === 'system'"
       />
       <DsfrButton
         data-testid="saveBtn"
