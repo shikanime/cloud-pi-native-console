@@ -241,7 +241,7 @@ describe('test admin-role business', () => {
     })
 
     it('should return 400 if incoherent positions', async () => {
-      const updateRoles: Pick<AdminRole, 'id' | 'position'> = [
+      const updateRoles: Pick<AdminRole, 'id' | 'position'>[] = [
         { id: dbRoles[0].id, position: 1 },
         { id: dbRoles[1].id, position: 1 },
       ]
@@ -253,7 +253,7 @@ describe('test admin-role business', () => {
       expect(prisma.adminRole.update).toHaveBeenCalledTimes(0)
     })
     it('should return 400 if incoherent positions (missing roles)', async () => {
-      const updateRoles: Pick<AdminRole, 'id' | 'position'> = [
+      const updateRoles: Pick<AdminRole, 'id' | 'position'>[] = [
         { id: dbRoles[1].id, position: 1 },
       ]
       prisma.adminRole.findMany.mockResolvedValue(dbRoles as any)
@@ -264,7 +264,7 @@ describe('test admin-role business', () => {
       expect(prisma.adminRole.update).toHaveBeenCalledTimes(0)
     })
     it('should update positions', async () => {
-      const updateRoles: Pick<AdminRole, 'id' | 'position'> = [
+      const updateRoles: Pick<AdminRole, 'id' | 'position'>[] = [
         { id: dbRoles[0].id, position: 1 },
         { id: dbRoles[1].id, position: 0 },
       ]
@@ -275,7 +275,7 @@ describe('test admin-role business', () => {
       expect(prisma.adminRole.update).toHaveBeenCalledTimes(2)
     })
     it('should update permissions', async () => {
-      const updateRoles: Pick<AdminRole, 'id' | 'position'> = [
+      const updateRoles: (Pick<AdminRole, 'id'> & { permissions?: string })[] = [
         { id: dbRoles[1].id, permissions: '0' },
       ]
       prisma.adminRole.findMany.mockResolvedValue(dbRoles as any)
