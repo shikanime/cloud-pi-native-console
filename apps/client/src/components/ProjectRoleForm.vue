@@ -11,6 +11,7 @@ const props = defineProps<{
   projectId: ProjectV2['id']
   isEveryone: boolean
   oidcGroup?: string
+  type?: string
 }>()
 
 defineEmits<{
@@ -110,7 +111,7 @@ function updateChecked(checked: boolean, value: bigint) {
         @click="$emit('save', role)"
       />
       <DsfrButton
-        v-if="!role.isEveryone"
+        v-if="!role.isEveryone && role.type !== 'system'"
         data-testid="deleteBtn"
         label="Supprimer"
         secondary
