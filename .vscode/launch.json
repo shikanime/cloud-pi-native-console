@@ -1,11 +1,25 @@
 {
-  // Utilisez IntelliSense pour en savoir plus sur les attributs possibles.
-  // Pointez pour afficher la description des attributs existants.
-  // Pour plus d'informations, visitez : https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Attach to Remote",
+      "name": "Launch Server",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "cwd": "${workspaceFolder}/apps/server",
+      "console": "integratedTerminal",
+      "restart": true,
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/node_modules/**/*.js"
+      ]
+    },
+    {
+      "name": "Attach Server",
       "type": "node",
       "request": "attach",
       "port": 9229,
@@ -16,6 +30,39 @@
       "skipFiles": [
         "<node_internals>/**",
         "${workspaceFolder}/node_modules/**/*.js"
+      ]
+    },
+    {
+      "name": "Launch Client (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}/apps/client",
+      "preLaunchTask": "serve: client"
+    },
+    {
+      "name": "Launch Client (Firefox)",
+      "type": "firefox",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}/apps/client",
+      "reAttach": true,
+      "preLaunchTask": "serve: client"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch (Chrome)",
+      "configurations": [
+        "Launch Server",
+        "Launch Client (Chrome)"
+      ]
+    },
+    {
+      "name": "Launch (Firefox)",
+      "configurations": [
+        "Launch Server",
+        "Launch Client (Firefox)"
       ]
     }
   ]
