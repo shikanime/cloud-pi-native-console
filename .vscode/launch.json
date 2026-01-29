@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Attach to Remote",
+      "name": "Attach Server",
       "type": "node",
       "request": "attach",
       "port": 9229,
@@ -17,6 +17,21 @@
         "<node_internals>/**",
         "${workspaceFolder}/node_modules/**/*.js"
       ]
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Launch Client (Chrome)",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}/apps/client"
+    },
+    {
+      "type": "firefox",
+      "request": "launch",
+      "name": "Launch Client (Firefox)",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}/apps/client",
+      "reAttach": true
     }
   ]
 }
