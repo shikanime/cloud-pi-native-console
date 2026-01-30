@@ -65,6 +65,15 @@ export const upsertProject: StepCall<Project> = async ({ args: project }) => {
     const kcClient = await getkcClient()
     const projectName = project.slug
     const projectGroup = await getOrCreateProjectGroup(kcClient, projectName)
+
+    // TODO: remove this when roles are passed to the plugin
+    await Promise.all([
+      getOrCreateChildGroup(kcClient, projectGroup.id, "admin"),
+      getOrCreateChildGroup(kcClient, projectGroup.id, "devops"),
+      getOrCreateChildGroup(kcClient, projectGroup.id, "developper"),
+      getOrCreateChildGroup(kcClient, projectGroup.id, "readonly"),
+    ])
+
     const groupMembers = await kcClient.groups.listMembers({ id: projectGroup.id })
 
     await Promise.all([
