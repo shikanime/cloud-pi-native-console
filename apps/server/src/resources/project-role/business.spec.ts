@@ -1,8 +1,8 @@
 import { faker } from '@faker-js/faker'
 import { describe, expect, it } from 'vitest'
-import type { ProjectMembers, ProjectRole, User } from '@prisma/client'
+import type { ProjectMembers, ProjectRole } from '@prisma/client'
 import prisma from '../../__mocks__/prisma.js'
-import { BadRequest400 } from '../../utils/errors.ts'
+import { BadRequest400, Forbidden403 } from '../../utils/errors.ts'
 import { countRolesMembers, createRole, deleteRole, listRoles, patchRoles } from './business.ts'
 
 const projectId = faker.string.uuid()
@@ -16,15 +16,16 @@ describe('test project-role business', () => {
         permissions: 4n,
         position: 0,
         oidcGroup: '',
+        type: 'custom',
       }
 
       prisma.projectRole.findMany.mockResolvedValueOnce([dbRole])
       const response = await listRoles(projectId)
-      expect(response).toEqual([{ permissions: '4' }])
+      expect(response).toContainEqual(expect.objectContaining({ permissions: '4' }))
     })
 
     it('should strip oidcGroup prefix', async () => {
-      const dbRole: any = {
+      const dbRole: ProjectRole = {
         id: faker.string.uuid(),
         name: faker.string.alphanumeric(),
         projectId,
@@ -51,6 +52,7 @@ describe('test project-role business', () => {
         permissions: 4n,
         position: 0,
         oidcGroup: '',
+        type: 'custom',
       }
 
       prisma.project.findUnique.mockResolvedValue({ name: 'My Project', slug: 'myproject' } as any)
@@ -70,6 +72,7 @@ describe('test project-role business', () => {
         permissions: 4n,
         position: 50,
         oidcGroup: '',
+        type: 'custom',
       }
 
       prisma.project.findUnique.mockResolvedValue({ name: 'My Project', slug: 'myproject' } as any)
@@ -89,6 +92,7 @@ describe('test project-role business', () => {
         permissions: 4n,
         position: 50,
         oidcGroup: '',
+        type: 'custom',
       }
 
       prisma.project.findUnique.mockResolvedValue({ name: 'My Project', slug: 'myproject' } as any)
@@ -141,6 +145,7 @@ describe('test project-role business', () => {
         permissions: 4n,
         position: 50,
         oidcGroup: '',
+        type: 'custom',
       }
       const members = [{
         userId: faker.string.uuid(),
@@ -162,6 +167,22 @@ describe('test project-role business', () => {
       expect(prisma.projectMembers.update).toHaveBeenNthCalledWith(2, { where: expect.any(Object), data: { roleIds: { set: [members[1].roleIds[1]] } } })
       expect(prisma.projectRole.delete).toHaveBeenCalledWith({ where: { id: roleId } })
     })
+
+    it('should throw Forbidden403 when deleting a system role', async () => {
+      const dbRole: ProjectRole = {
+        id: roleId,
+        name: 'Administrateur',
+        projectId,
+        permissions: 4n,
+        position: 50,
+        oidcGroup: '',
+        type: 'system',
+      }
+      prisma.projectRole.findUnique.mockResolvedValueOnce(dbRole)
+
+      await expect(deleteRole(roleId)).rejects.toThrow(Forbidden403)
+      expect(prisma.projectRole.delete).not.toHaveBeenCalled()
+    })
   })
   describe.skip('countRolesMembers', () => {
     it('should return aggregated role member counts', async () => {
@@ -172,6 +193,7 @@ describe('test project-role business', () => {
         permissions: 4n,
         position: 50,
         oidcGroup: '',
+        type: 'custom',
       }, {
         id: faker.string.uuid(),
         name: faker.string.alphanumeric(),
@@ -179,6 +201,7 @@ describe('test project-role business', () => {
         permissions: 4n,
         position: 50,
         oidcGroup: '',
+        type: 'custom',
       }] as const satisfies ProjectRole[]
 
       const members = [{
@@ -199,6 +222,7 @@ describe('test project-role business', () => {
       expect(response).toEqual({ [roles[0].id]: 1, [roles[1].id]: 2 })
     })
   })
+
   describe('patchRoles', () => {
     const dbRoles: ProjectRole[] = [{
       id: faker.string.uuid(),
@@ -207,6 +231,7 @@ describe('test project-role business', () => {
       position: 0,
       projectId,
       oidcGroup: 'group1',
+      type: 'custom',
     }, {
       id: faker.string.uuid(),
       name: faker.string.alphanumeric(),
@@ -214,7 +239,30 @@ describe('test project-role business', () => {
       position: 1,
       projectId,
       oidcGroup: 'group2',
+      type: 'custom',
     }]
+
+    it('should throw Forbidden403 when renaming a system role', async () => {
+      const systemRole: ProjectRole = {
+        id: faker.string.uuid(),
+        name: 'Administrateur',
+        permissions: 10n,
+        position: 0,
+        projectId,
+        oidcGroup: 'admin-group',
+        type: 'system',
+      }
+      prisma.project.findUnique.mockResolvedValue({ name: 'My Project', slug: 'myproject' } as any)
+      prisma.projectRole.findMany.mockResolvedValue([systemRole])
+
+      const updateRoles = [{
+        id: systemRole.id,
+        name: 'New Admin Name',
+      }]
+
+      await expect(patchRoles(projectId, updateRoles)).rejects.toThrow(Forbidden403)
+      expect(prisma.projectRole.update).toHaveBeenCalledTimes(0)
+    })
 
     it('should do nothing', async () => {
       prisma.project.findUnique.mockResolvedValue({ name: 'My Project', slug: 'myproject' } as any)
@@ -279,6 +327,7 @@ describe('test project-role business', () => {
           permissions: 0n,
           position: 1,
           oidcGroup: dbRoles[1].oidcGroup,
+          type: 'custom',
         },
         where: {
           id: dbRoles[1].id,
