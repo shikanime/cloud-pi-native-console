@@ -17,6 +17,24 @@ describe('test project-role business', () => {
       const response = await listRoles(projectId)
       expect(response).toEqual([{ permissions: '4' }])
     })
+
+    it('should strip oidcGroup prefix', async () => {
+      const dbRole: any = {
+        id: faker.string.uuid(),
+        name: faker.string.alphanumeric(),
+        projectId,
+        permissions: 4n,
+        position: 0,
+        oidcGroup: `/project-myproject/admin`,
+        type: 'custom',
+      }
+
+      prisma.project.findUnique.mockResolvedValueOnce({ name: 'My Project', slug: 'myproject' } as any)
+      prisma.projectRole.findMany.mockResolvedValueOnce([dbRole])
+
+      const response = await listRoles(projectId)
+      expect(response[0].oidcGroup).toBe('/admin')
+    })
   })
 
   describe('createRole', () => {
@@ -61,6 +79,33 @@ describe('test project-role business', () => {
       await createRole(projectId, { name: 'test', permissions: '4' })
 
       expect(prisma.projectRole.create).toHaveBeenCalledWith({ data: { name: 'test', permissions: 4n, position: 0, projectId } })
+    })
+
+    it('should create role with enforced oidcGroup prefix', async () => {
+      const dbRole: any = {
+        id: faker.string.uuid(),
+        name: faker.string.alphanumeric(),
+        projectId,
+        permissions: 4n,
+        position: 0,
+        oidcGroup: '/project-myproject/admin',
+        type: 'custom',
+      }
+
+      prisma.project.findUnique.mockResolvedValueOnce({ name: 'My Project', slug: 'myproject' } as any)
+      prisma.projectRole.findFirst.mockResolvedValueOnce(dbRole)
+      prisma.projectRole.create.mockResolvedValue(dbRole)
+      // listRoles mock
+      prisma.project.findUnique.mockResolvedValueOnce({ name: 'My Project', slug: 'myproject' } as any)
+      prisma.projectRole.findMany.mockResolvedValueOnce([dbRole])
+
+      await createRole(projectId, { name: 'test', permissions: '4', oidcGroup: '/admin' })
+
+      expect(prisma.projectRole.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          oidcGroup: '/project-myproject/admin',
+        }),
+      }))
     })
   })
 
@@ -190,6 +235,26 @@ describe('test project-role business', () => {
           id: dbRoles[1].id,
         },
       })
+    })
+
+    it('should update role with enforced oidcGroup prefix', async () => {
+      const updateRoles: any[] = [
+        { id: dbRoles[1].id, oidcGroup: '/admin' },
+      ]
+
+      // patchRoles calls project.findUnique
+      prisma.project.findUnique.mockResolvedValue({ name: 'My Project', slug: 'myproject' } as any)
+
+      const dbRoleWithPrefix = { ...dbRoles[1], oidcGroup: '/project-myproject/group2' }
+      prisma.projectRole.findMany.mockResolvedValue([dbRoleWithPrefix])
+
+      await patchRoles(projectId, updateRoles)
+
+      expect(prisma.projectRole.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          oidcGroup: '/project-myproject/admin',
+        }),
+      }))
     })
   })
 })
