@@ -6,7 +6,7 @@ import {
   listRoles as listRolesQuery,
   updateRole,
 } from '@/resources/queries-index.js'
-import { BadRequest400, Forbidden403 } from '@/utils/errors.js'
+import { BadRequest400, Forbidden403, NotFound404 } from '@/utils/errors.js'
 import prisma from '@/prisma.js'
 
 export async function listRoles(projectId: Project['id']) {
@@ -46,6 +46,7 @@ export async function patchRoles(projectId: Project['id'], roles: typeof project
         permissions: matchingRole?.permissions ? BigInt(matchingRole?.permissions) : BigInt(dbRole.permissions),
         position: matchingRole?.position ?? dbRole.position,
         oidcGroup,
+        type: dbRole.type,
       }
     })
   if (positionsAvailable.length && positionsAvailable.length !== dbRoles.length) return new BadRequest400('Les numéros de position des rôles sont incohérentes')
@@ -95,6 +96,13 @@ export async function countRolesMembers(projectId: Project['id']) {
 }
 
 export async function deleteRole(roleId: Project['id']) {
+  const role = await prisma.projectRole.findUnique({
+    where: { id: roleId },
+  })
+  if (!role) throw new NotFound404()
+  if (role.type === 'system') {
+    throw new Forbidden403('Ce rôle système ne peut pas être supprimé')
+  }
   await deleteRoleQuery(roleId)
   return null
 }
