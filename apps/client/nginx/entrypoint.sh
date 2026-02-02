@@ -17,7 +17,7 @@ for file in $ROOT_DIR/assets/*.js; do
   populate SERVER_PORT $file
   populate OPENCDS_ENABLED $file
   populate KEYCLOAK_PROTOCOL $file
-  populate KEYCLOAK_DOMAIN $file
+  populate VITE_KEYCLOAK_DOMAIN $file
   populate KEYCLOAK_REALM $file
   populate KEYCLOAK_CLIENT_ID $file
   populate KEYCLOAK_REDIRECT_URI $file
