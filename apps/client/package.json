@@ -13,7 +13,7 @@
     "format": "NODE_OPTIONS='--no-warnings=ExperimentalWarning' eslint ./ --fix",
     "format:style": "stylelint ./src/**/*.{css,vue} --fix",
     "icons": "vue-dsfr-icons -s scripts/icons.js -t src/icon-collections.ts",
-    "integ": "vite --mode=integration",
+    "integ": "vite --mode=integ",
     "kube:e2e": "CLIENT_HOST=console.dso.local CLIENT_PORT=80 cypress open",
     "lint": "run-p lint:*",
     "lint:style": "stylelint ./src/**/*.{css,vue}",
