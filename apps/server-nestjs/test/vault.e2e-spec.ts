@@ -16,7 +16,7 @@ import { projectSelect } from '../src/modules/vault/vault-datastore.service'
 import { makeProjectWithDetails } from '../src/modules/vault/vault-testing.utils'
 import { VaultModule } from '../src/modules/vault/vault.module'
 import { getDotenvPaths } from '../src/utils/dotenv.utils'
-import { E2E_TIMEOUT } from './e2e-timeout'
+import { PROVISION_HEAVY_TIMEOUT } from './e2e-timeout'
 
 const canRunVaultE2E
   = Boolean(process.env.E2E)
@@ -102,7 +102,7 @@ describeWithVault('VaultService (e2e)', () => {
     const group = await vaultClient.getIdentityGroupName(adminGroupName)
     expect(group.data?.id).toBeTruthy()
     expect(group.data?.name).toBe(adminGroupName)
-  }, E2E_TIMEOUT.provisionHeavy)
+  }, PROVISION_HEAVY_TIMEOUT)
 
   it('should remove project from Vault on delete', async () => {
     const project = await prisma.project.findUniqueOrThrow({
@@ -116,5 +116,5 @@ describeWithVault('VaultService (e2e)', () => {
     await eventEmitter.emitAsync('project.delete', project)
 
     await expect(vaultClient.getIdentityGroupName(adminGroupName)).rejects.toThrow('Not Found')
-  }, E2E_TIMEOUT.provisionHeavy)
+  }, PROVISION_HEAVY_TIMEOUT)
 })
