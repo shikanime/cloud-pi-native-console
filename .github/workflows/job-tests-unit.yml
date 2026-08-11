@@ -56,6 +56,11 @@ jobs:
           restore-keys: |
             node-${{ runner.os }}-${{ runner.arch }}-
 
+      - name: Install mise
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          experimental: true
+
       - name: Install dependencies
         run: pnpm -r install --frozen-lockfile
 
@@ -67,7 +72,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          ./ci/scripts/init-env.sh
+          ./ci/scripts/sync-env.sh
           ./ci/scripts/run-tests.sh -u
 
       - name: Upload vitest coverage artifacts

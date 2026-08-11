@@ -114,8 +114,8 @@ Une fois le projet cloné, lancez les commandes suivantes dans votre terminal po
 # Installer les dépendances du projet
 pnpm install
 
-# Créer les fichiers d'environnement exemples
-./ci/scripts/init-env.sh
+# Générer les fichiers d'environnement (configuration mise + secrets fnox)
+./ci/scripts/sync-env.sh
 
 # Générer le client Prisma côté serveur
 pnpm --filter @cpn-console/server run db:generate

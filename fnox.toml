@@ -1,6 +1,77 @@
+# Secrets — séparés de la configuration (qui vit dans les mise.toml).
+#
+# Règle de partage retenue pour #2125 :
+#   - une valeur qui change selon l'environnement mais peut être lue par tous
+#     -> configuration, dans un mise.toml
+#   - une valeur qui ne doit pas fuiter (jeton, mot de passe, URL avec
+#     identifiants) -> secret, ici
+#
+# Profil `default` : valeurs de développement local, volontairement en clair.
+# Ce ne sont PAS de vrais secrets : elles sont déjà publiques dans les
+# .env-example et dans le realm Keycloak de dev.
+#
+# Profils `integ` / `production` : résolus depuis un gestionnaire de secrets,
+# jamais commités. Sélection via FNOX_PROFILE.
+#
+#   fnox check                          # vérifie que tout est résolvable
+#   FNOX_PROFILE=integ fnox check
+#
+# `pass` est le provider retenu pour le PoC ; il est remplaçable
+# (vault, 1password, gcp...) sans toucher au reste du dépôt.
+
 [providers]
-pass = {type="password-store", prefix="fnox/"}
+dev = { type = "plain" }
 
 [secrets]
-DATABASE_URL= { provider = "pass", value = "DATABASE_URL" }
-DB_PASSWORD = { provider = "pass", value = "database/production" }
+SESSION_SECRET = { provider = "dev", value = "a-very-strong-secret-with-more-than-32-char" }
+KEYCLOAK_CLIENT_SECRET = { provider = "dev", value = "client-secret-backend" }
+KEYCLOAK_ADMIN = { provider = "dev", value = "admin" }
+KEYCLOAK_ADMIN_PASSWORD = { provider = "dev", value = "admin" }
+DB_URL = { provider = "dev", value = "postgresql://admin:admin@localhost:5432/dso-console-db?schema=public" }
+OPENCDS_API_TOKEN = { provider = "dev", value = "token" }
+
+# En Docker local, seul l'hôte de la base change : le service compose
+# remplace localhost.
+[profiles.docker.providers]
+dev = { type = "plain" }
+
+[profiles.docker.secrets]
+DB_URL = { provider = "dev", value = "postgresql://admin:admin@postgres:5432/dso-console-db?schema=public" }
+
+# --- Environnements réels : rien en clair dans le dépôt. ---
+
+[profiles.integ.providers]
+pass = { type = "password-store", prefix = "cpn-console/integ/" }
+
+[profiles.integ.secrets]
+SESSION_SECRET = { provider = "pass", value = "session-secret" }
+DB_URL = { provider = "pass", value = "db-url" }
+KEYCLOAK_CLIENT_SECRET = { provider = "pass", value = "keycloak-client-secret" }
+KEYCLOAK_ADMIN = { provider = "pass", value = "keycloak-admin" }
+KEYCLOAK_ADMIN_PASSWORD = { provider = "pass", value = "keycloak-admin-password" }
+OPENCDS_API_TOKEN = { provider = "pass", value = "opencds-api-token" }
+GITLAB_TOKEN = { provider = "pass", value = "gitlab-token" }
+HARBOR_ADMIN = { provider = "pass", value = "harbor-admin" }
+HARBOR_ADMIN_PASSWORD = { provider = "pass", value = "harbor-admin-password" }
+NEXUS_ADMIN = { provider = "pass", value = "nexus-admin" }
+NEXUS_ADMIN_PASSWORD = { provider = "pass", value = "nexus-admin-password" }
+SONAR_API_TOKEN = { provider = "pass", value = "sonar-api-token" }
+VAULT_TOKEN = { provider = "pass", value = "vault-token" }
+
+[profiles.production.providers]
+pass = { type = "password-store", prefix = "cpn-console/production/" }
+
+[profiles.production.secrets]
+SESSION_SECRET = { provider = "pass", value = "session-secret" }
+DB_URL = { provider = "pass", value = "db-url" }
+KEYCLOAK_CLIENT_SECRET = { provider = "pass", value = "keycloak-client-secret" }
+KEYCLOAK_ADMIN = { provider = "pass", value = "keycloak-admin" }
+KEYCLOAK_ADMIN_PASSWORD = { provider = "pass", value = "keycloak-admin-password" }
+OPENCDS_API_TOKEN = { provider = "pass", value = "opencds-api-token" }
+GITLAB_TOKEN = { provider = "pass", value = "gitlab-token" }
+HARBOR_ADMIN = { provider = "pass", value = "harbor-admin" }
+HARBOR_ADMIN_PASSWORD = { provider = "pass", value = "harbor-admin-password" }
+NEXUS_ADMIN = { provider = "pass", value = "nexus-admin" }
+NEXUS_ADMIN_PASSWORD = { provider = "pass", value = "nexus-admin-password" }
+SONAR_API_TOKEN = { provider = "pass", value = "sonar-api-token" }
+VAULT_TOKEN = { provider = "pass", value = "vault-token" }

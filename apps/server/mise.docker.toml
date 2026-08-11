@@ -1,0 +1,7 @@
+# MISE_ENV=docker — équivalent de l'ancien .env.docker
+[env]
+DOCKER = "true"
+SERVER_PORT = "8080"
+KEYCLOAK_DOMAIN = "keycloak:8080"
+OPENCDS_URL = "http://dso-opencds_mockoon:3100/api/v1"
+OPENCDS_API_TLS_REJECT_UNAUTHORIZED = "false"

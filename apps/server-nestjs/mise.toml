@@ -1,0 +1,11 @@
+[env]
+SERVER_PORT = "4000"
+KEYCLOAK_DOMAIN = "localhost:8090"
+KEYCLOAK_CLIENT_ID = "dso-console-backend"
+DEV_SETUP = "true"
+OPENCDS_URL = ""
+OPENCDS_API_TLS_REJECT_UNAUTHORIZED = "true"
+
+[tasks.build]
+description = "Build le serveur NestJS"
+run = "pnpm run build"

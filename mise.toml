@@ -1,22 +1,45 @@
-experimental_monorepo_root = true
+monorepo_root = true
 
 [monorepo]
-config_roots = [
-  "packages/*"
-]
+config_roots = ["packages/*", "plugins/*", "apps/*"]
 
 [tools]
-node = "24"
+node = "26"
+pnpm = "11"
 fnox = "latest"
-pnpm = "10"
 
+# Configuration non sensible, partagée par tous les workspaces.
+# Les secrets ne vivent PAS ici : voir fnox.toml.
 [env]
 NODE_ENV = "development"
-DATABASE_URL= {value="{{exec(command='fnox get DATABASE_URL')}}"}
+CONTACT_EMAIL = "cloudpinative-relations@interieur.gouv.fr"
+KEYCLOAK_REALM = "cloud-pi-native"
+KEYCLOAK_PROTOCOL = "http"
+KEYCLOAK_REDIRECT_URI = "http://localhost:8080"
 
-[shell_alias]
-node_version="echo {{exec(command='node --version')}}"
+[tasks.install]
+description = "Installe les dépendances du monorepo (pnpm workspace, une seule fois)"
+run = "pnpm install --frozen-lockfile"
 
 [tasks.build]
-description="build the whole stack"
-depends = ["//packages/...:build"]
+description = "Build l'ensemble du monorepo"
+depends = ["install"]
+run = "pnpm -r run build"
+
+[tasks.lint]
+description = "Lint l'ensemble du monorepo"
+depends = ["install"]
+run = "./ci/scripts/run-tests.sh -l"
+
+[tasks.test]
+description = "Tests unitaires de l'ensemble du monorepo"
+depends = ["install"]
+run = "./ci/scripts/run-tests.sh -u"
+
+[tasks."env:sync"]
+description = "Génère les fichiers .env consommés par docker compose et les apps depuis mise + fnox"
+run = "./ci/scripts/sync-env.sh"
+
+[tasks."env:check"]
+description = "Vérifie que tous les secrets déclarés sont résolvables"
+run = "fnox check"

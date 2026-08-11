@@ -1,0 +1,9 @@
+# MISE_ENV=docker — équivalent de l'ancien .env.docker
+[env]
+DOCKER = "true"
+KEYCLOAK_DOMAIN = "keycloak:8080"
+# server-nestjs écoute sur 3001 pour cohabiter avec le server legacy (8080)
+# pendant la migration Strangler Fig (#1885)
+SERVER_PORT = "3001"
+OPENCDS_URL = "http://dso-opencds_mockoon:3100/api/v1"
+OPENCDS_API_TLS_REJECT_UNAUTHORIZED = "false"

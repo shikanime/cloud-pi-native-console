@@ -53,11 +53,38 @@ Le mécanisme de surcharge des différentes configurations fonctionne de cette m
 var d'env settée explicitement -> fichier .env.docker (si contexte docker) -> fichier .env.integ (si INTEGRATION=true) -> fichier .env
 ```
 
-## Prégénération des fichiers .env, .env.docker, et .env.integ
+## Génération des fichiers .env, .env.docker, et .env.integ
 
-Un script permet de copier facilement les fichiers `.env*-example` en leur équivalent `.env*`: [`./ci/scripts/init-env.sh`](./ci/scripts/init-env.sh).
+La configuration et les secrets ne sont plus saisis à la main dans les
+fichiers `.env*` : ils sont déclarés une seule fois, puis générés.
 
-> Il faut ensuite remplir ces fichiers, car ils ne sont là que simplement copiés avec les valeurs par défaut
+- la **configuration** (non sensible) vit dans les `mise.toml` :
+  `mise.toml` à la racine pour ce qui est commun, `apps/<app>/mise.toml` pour
+  chaque application, et `apps/<app>/mise.<env>.toml` pour les surcharges
+  (`docker`, `integ`) ;
+- les **secrets** vivent dans [`fnox.toml`](./fnox.toml), avec un profil par
+  environnement. Seules les valeurs de développement local y figurent en
+  clair ; `integ` et `production` sont résolus depuis un gestionnaire de
+  secrets et ne sont jamais commités.
+
+```shell
+# Génère apps/*/.env (développement local)
+./ci/scripts/sync-env.sh
+
+# Génère apps/*/.env.docker
+./ci/scripts/sync-env.sh -e docker
+
+# Génère apps/*/.env.integ
+./ci/scripts/sync-env.sh -e integ
+```
+
+Le script échoue si un secret déclaré n'est pas résolvable, plutôt que de
+générer un fichier incomplet avec lequel l'application démarrerait mal
+configurée.
+
+Les fichiers `.env*-example` restent la référence documentaire des variables
+attendues. Le script [`./ci/scripts/test-env-parity.sh`](./ci/scripts/test-env-parity.sh)
+vérifie en CI que les fichiers générés leur restent équivalents.
 
 ## Configuration pour le développement entièrement en local
 

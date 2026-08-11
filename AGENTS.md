@@ -13,7 +13,7 @@ pnpm monorepo. Node >= 26, pnpm v11.8
 - `packages/test-utils`, `packages/eslintconfig`, `packages/tsconfig`
 - `playwright/` : E2E tests (dedicated workspace)
 - `docker/` : docker-compose files (local, dev, integ, prod, ci)
-- `ci/scripts/` : init-env.sh, setup.sh, cleanup.sh, run-tests.sh
+- `ci/scripts/` : sync-env.sh, test-env-parity.sh, setup.sh, cleanup.sh, run-tests.sh
 - `keycloak/` : DSFR theme and dev realm data
 
 ## Server architecture (Fastify)
@@ -82,4 +82,4 @@ Migrations: standard Prisma Migrate. Major version data migrations in `migration
 ## Conventions
 
 - Template env files use `-example` suffix (not `.example`)
-- `ci/scripts/init-env.sh` copies `*-example` to active equivalents (non-destructive)
+- `ci/scripts/sync-env.sh` generates active `.env*` from mise (config) + fnox (secrets); `*-example` files remain the documented reference

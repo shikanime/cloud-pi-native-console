@@ -1,0 +1,15 @@
+[env]
+SERVER_HOST = "localhost"
+# En dev local via nginx-strangler, surcharger à 8082 (cf. nginx/README.md)
+SERVER_PORT = "4000"
+KEYCLOAK_DOMAIN = "localhost:8090"
+KEYCLOAK_CLIENT_ID = "dso-console-frontend"
+OPENCDS_ENABLED = "false"
+
+[tasks.build]
+description = "Build le client"
+run = "pnpm run build"
+
+[tasks.dev]
+description = "Lance le client en développement"
+run = "pnpm run dev"

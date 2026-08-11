@@ -1,0 +1,15 @@
+[env]
+SERVER_PORT = "4001"
+KEYCLOAK_DOMAIN = "localhost:8090"
+KEYCLOAK_CLIENT_ID = "dso-console-backend"
+DEV_SETUP = "true"
+OPENCDS_URL = ""
+OPENCDS_API_TLS_REJECT_UNAUTHORIZED = "true"
+
+[tasks.build]
+description = "Build le serveur"
+run = "pnpm run build"
+
+[tasks.dev]
+description = "Lance le serveur en développement"
+run = "pnpm run dev"
