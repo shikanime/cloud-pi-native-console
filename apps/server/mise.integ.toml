@@ -16,14 +16,30 @@ KEYCLOAK_URL = { required = "URL complète de Keycloak (peut différer de KEYCLO
 
 ARGO_NAMESPACE = { required = "Namespace Kubernetes dans lequel ArgoCD est déployé" }
 ARGOCD_URL = { required = "URL de l'API ArgoCD" }
+ARGOCD_INTERNAL_URL = { required = "URL interne de l'API ArgoCD" }
+
 GITLAB_URL = { required = "URL de l'instance GitLab" }
+GITLAB_INTERNAL_URL = { required = "URL interne de l'API GitLab" }
+
 HARBOR_URL = { required = "URL de l'instance Harbor" }
+HARBOR_INTERNAL_URL = { required = "URL interne de l'API Harbor" }
+
 NEXUS_URL = { required = "URL de l'instance Nexus" }
+NEXUS_INTERNAL_URL = { required = "URL interne de l'API Nexus" }
+
 SONARQUBE_URL = { required = "URL de l'instance SonarQube" }
+SONARQUBE_INTERNAL_URL = { required = "URL interne de l'API SonarQube" }
+
 VAULT_URL = { required = "URL de l'instance Vault" }
+VAULT_INTERNAL_URL = { required = "URL interne de l'API Vault" }
 
 PROJECTS_ROOT_DIR = { required = "Répertoire racine des projets sur le serveur" }
 EXTERNAL_PLUGINS_DIR_HOST_PATH = { required = "Répertoire des plugins externes monté en volume" }
 KUBECONFIG_HOST_PATH = { required = "Chemin du kubeconfig sur la machine hôte" }
 KUBECONFIG_PATH = "{{env.HOME}}/.kube/config"
 KUBECONFIG_CTX = { required = "Contexte Kubernetes à utiliser" }
+
+# Observabilité (valeurs d'exemple, surchargées en intégration)
+GRAFANA_URL = ""
+DSO_OBSERVABILITY_CHART_VERSION = "dso-observability-0.1.7"
+OPENCDS_URL = ""

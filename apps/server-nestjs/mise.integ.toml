@@ -14,16 +14,42 @@ KEYCLOAK_REALM = { required = "Royaume Keycloak d'intégration" }
 KEYCLOAK_CLIENT_ID = { required = "Client Keycloak backend d'intégration" }
 KEYCLOAK_URL = { required = "URL complète de Keycloak (peut différer de KEYCLOAK_DOMAIN)" }
 
+KEYCLOAK_JWKS_CACHE_TTL_MS = "300000"
+KEYCLOAK_JWKS_TIMEOUT_MS = "1000"
+
 ARGO_NAMESPACE = { required = "Namespace Kubernetes dans lequel ArgoCD est déployé" }
 ARGOCD_URL = { required = "URL de l'API ArgoCD" }
-GITLAB_URL = { required = "URL de l'instance GitLab" }
-HARBOR_URL = { required = "URL de l'instance Harbor" }
-NEXUS_URL = { required = "URL de l'instance Nexus" }
-SONARQUBE_URL = { required = "URL de l'instance SonarQube" }
-VAULT_URL = { required = "URL de l'instance Vault" }
+ARGOCD_INTERNAL_URL = { required = "URL interne de l'API ArgoCD" }
 
-PROJECTS_ROOT_DIR = { required = "Répertoire racine des projets sur le serveur" }
-EXTERNAL_PLUGINS_DIR_HOST_PATH = { required = "Répertoire des plugins externes monté en volume" }
+GITLAB_URL = { required = "URL de l'instance GitLab" }
+GITLAB_INTERNAL_URL = { required = "URL interne de l'API GitLab" }
+
+HARBOR_URL = { required = "URL de l'instance Harbor" }
+HARBOR_INTERNAL_URL = { required = "URL interne de l'API Harbor" }
+
+KEYCLOAK_ADMIN_CLIENT_ID = "admin-cli"
+
+NEXUS_URL = { required = "URL de l'instance Nexus" }
+NEXUS_INTERNAL_URL = { required = "URL interne de l'API Nexus" }
+
+PROJECTS_ROOT_DIR = "forge-mi/projects"
+
+SONARQUBE_URL = { required = "URL de l'instance SonarQube" }
+SONARQUBE_INTERNAL_URL = { required = "URL interne de l'API SonarQube" }
+
+VAULT_URL = { required = "URL de l'instance Vault" }
+VAULT_INTERNAL_URL = { required = "URL interne de l'API Vault" }
+
 KUBECONFIG_HOST_PATH = { required = "Chemin du kubeconfig sur la machine hôte" }
 KUBECONFIG_PATH = "{{env.HOME}}/.kube/config"
 KUBECONFIG_CTX = { required = "Contexte Kubernetes à utiliser" }
+
+EXTERNAL_PLUGINS_DIR_HOST_PATH = { required = "Répertoire des plugins externes monté en volume" }
+
+USE_OBSERVABILITY = "false"
+
+GRAFANA_URL = ""
+DSO_OBSERVABILITY_CHART_VERSION = "dso-observability-0.1.7"
+
+OPENCDS_URL = ""
+OPENCDS_INTERNAL_URL = ""
