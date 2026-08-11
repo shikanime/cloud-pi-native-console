@@ -1,10 +1,14 @@
 [env]
+LOG_LEVEL = "debug"
+DEV_SETUP = "true"
 SERVER_PORT = "4001"
 KEYCLOAK_DOMAIN = "localhost:8090"
 KEYCLOAK_CLIENT_ID = "dso-console-backend"
-DEV_SETUP = "true"
 OPENCDS_URL = ""
 OPENCDS_API_TLS_REJECT_UNAUTHORIZED = "true"
+EXTERNAL_PLUGINS_DIR_HOST_PATH = "/local/path/for/plugins"
+GRAFANA_URL = ""
+DSO_OBSERVABILITY_CHART_VERSION = "dso-observability-0.1.7"
 
 [tasks.build]
 description = "Build le serveur"

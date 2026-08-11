@@ -1,9 +1,20 @@
 # MISE_ENV=docker — équivalent de l'ancien .env.docker
 [env]
 DOCKER = "true"
-KEYCLOAK_DOMAIN = "keycloak:8080"
-# server-nestjs écoute sur 3001 pour cohabiter avec le server legacy (8080)
-# pendant la migration Strangler Fig (#1885)
+SERVER_HOST = "0.0.0.0"
 SERVER_PORT = "3001"
-OPENCDS_URL = "http://dso-opencds_mockoon:3100/api/v1"
+KEYCLOAK_DOMAIN = "keycloak:8080"
+KEYCLOAK_ADMIN_CLIENT_ID = "admin-cli"
+KEYCLOAK_JWKS_CACHE_TTL_MS = "300000"
+KEYCLOAK_JWKS_TIMEOUT_MS = "1000"
 OPENCDS_API_TLS_REJECT_UNAUTHORIZED = "false"
+USE_ARGOCD = "false"
+USE_GITLAB = "false"
+USE_NEXUS = "false"
+USE_HARBOR = "false"
+USE_SONARQUBE = "false"
+USE_SERVICE_CHAIN = "true"
+USE_VAULT = "false"
+USE_OBSERVABILITY = "false"
+GRAFANA_URL = "https://grafana.example.com"
+DSO_OBSERVABILITY_CHART_VERSION = "dso-observability-0.1.7"

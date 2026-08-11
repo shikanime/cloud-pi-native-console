@@ -1,7 +1,7 @@
 # MISE_ENV=docker — équivalent de l'ancien .env.docker
 [env]
 DOCKER = "true"
-SERVER_HOST = "server"
+SERVER_HOST = "nginx-strangler"
 SERVER_PORT = "8080"
 # KEYCLOAK_DOMAIN n'est PAS surchargé : il est résolu par le navigateur,
 # pas depuis le réseau docker. Il reste donc localhost:8090.

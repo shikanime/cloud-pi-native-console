@@ -1,6 +1,5 @@
 [env]
 SERVER_HOST = "localhost"
-# En dev local via nginx-strangler, surcharger à 8082 (cf. nginx/README.md)
 SERVER_PORT = "4000"
 KEYCLOAK_DOMAIN = "localhost:8090"
 KEYCLOAK_CLIENT_ID = "dso-console-frontend"

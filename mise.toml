@@ -13,7 +13,7 @@ fnox = "latest"
 [env]
 NODE_ENV = "development"
 CONTACT_EMAIL = "cloudpinative-relations@interieur.gouv.fr"
-KEYCLOAK_REALM = "cloud-pi-native"
+KEYCLOAK_REALM = "dso"
 KEYCLOAK_PROTOCOL = "http"
 KEYCLOAK_REDIRECT_URI = "http://localhost:8080"
 
