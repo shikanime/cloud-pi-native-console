@@ -10,6 +10,10 @@ export const MIRROR_REPO_NAME = 'mirror'
 /** Console-managed plumbing repositories, never a valid mirroring target. */
 export const SPECIAL_REPO_NAMES: string[] = [INFRA_APPS_REPO_NAME, MIRROR_REPO_NAME]
 
+// CI/CD
+/** Custom CI config path applied to user repositories mirroring an external URL (legacy `clone: true`). */
+export const GITLAB_CI_CONFIG_PATH = '.gitlab-ci-dso.yml'
+
 // Managed resources sentinel
 export const TOPIC_PLUGIN_MANAGED = 'plugin-managed'
 export const TOKEN_DESCRIPTION = 'mirroring-from-external-repo'

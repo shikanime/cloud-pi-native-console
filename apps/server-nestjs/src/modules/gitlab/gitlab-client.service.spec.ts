@@ -26,6 +26,7 @@ import {
   makeRepositoryTreeSchema,
 } from './gitlab-testing.utils'
 import {
+  GITLAB_CI_CONFIG_PATH,
   GROUP_ROOT_CUSTOM_ATTRIBUTE_KEY,
   INFRA_GROUP_CUSTOM_ATTRIBUTE_KEY,
   MANAGED_BY_CONSOLE_CUSTOM_ATTRIBUTE_KEY,
@@ -273,6 +274,7 @@ describe('gitlab-client', () => {
       expect(gitlabApi.Projects.edit).toHaveBeenCalledWith(repoId, expect.objectContaining({
         name: 'mirror',
         path: 'mirror',
+        ciConfigPath: '',
       }))
     })
 
@@ -288,6 +290,44 @@ describe('gitlab-client', () => {
 
       expect(result).toEqual(expect.objectContaining({ id: repoId, name: repoName }))
       expect(gitlabApi.ProjectCustomAttributes.set).toHaveBeenCalledWith(repoId, MANAGED_BY_CONSOLE_CUSTOM_ATTRIBUTE_KEY, 'true')
+    })
+
+    it('should forward a custom ciConfigPath to repo creation and edit', async () => {
+      const projectSlug = 'project-1'
+      const repoName = 'repo-1'
+      const repoId = 101
+      const groupId = 456
+      const rootId = 123
+
+      const gitlabProjectsAllMock = gitlabApi.Projects.all as MockedFunction<typeof gitlabApi.Projects.all>
+      gitlabProjectsAllMock.mockResolvedValueOnce({
+        data: [],
+        paginationInfo: { next: null },
+      })
+
+      const gitlabGroupsAllMock = gitlabApi.Groups.all as MockedFunction<typeof gitlabApi.Groups.all>
+      gitlabGroupsAllMock.mockResolvedValueOnce({
+        data: [{ id: rootId, full_path: 'forge' }],
+        paginationInfo: { next: null },
+      })
+
+      gitlabGroupsAllMock.mockResolvedValueOnce({
+        data: [{ id: groupId, name: projectSlug, parent_id: rootId, full_path: `forge/${projectSlug}` }],
+        paginationInfo: { next: null },
+      })
+
+      gitlabApi.Projects.create.mockResolvedValue(makeProjectSchema({ id: repoId, name: repoName }))
+      gitlabApi.Projects.edit.mockResolvedValue(makeProjectSchema({ id: repoId, name: repoName }))
+
+      const result = await service.upsertProjectGroupRepo(projectSlug, repoName, undefined, GITLAB_CI_CONFIG_PATH)
+
+      expect(result).toEqual(expect.objectContaining({ id: repoId, name: repoName }))
+      expect(gitlabApi.Projects.create).toHaveBeenCalledWith(expect.objectContaining({
+        ciConfigPath: GITLAB_CI_CONFIG_PATH,
+      }))
+      expect(gitlabApi.Projects.edit).toHaveBeenCalledWith(repoId, expect.objectContaining({
+        ciConfigPath: GITLAB_CI_CONFIG_PATH,
+      }))
     })
 
     describe('triggerMirror', () => {
@@ -641,6 +681,76 @@ describe('gitlab-client', () => {
       }))
       expect(gitlabApi.ProjectCustomAttributes.set).toHaveBeenCalledWith(projectId, MANAGED_BY_CONSOLE_CUSTOM_ATTRIBUTE_KEY, 'true')
       expect(gitlabApi.ProjectCustomAttributes.set).toHaveBeenCalledWith(projectId, PROJECT_GROUP_CUSTOM_ATTRIBUTE_KEY, 'project-1')
+    })
+
+    it('should create repo with a custom ciConfigPath when provided', async () => {
+      const subGroupPath = 'project-1'
+      const repoName = 'repo-1'
+      const fullPath = `${subGroupPath}/${repoName}`
+      const projectId = 789
+      const groupId = 456
+      const rootId = 123
+
+      const gitlabProjectsAllMock = gitlabApi.Projects.all as MockedFunction<typeof gitlabApi.Projects.all>
+      gitlabProjectsAllMock.mockResolvedValueOnce({
+        data: [],
+        paginationInfo: { next: null },
+      })
+
+      const gitlabGroupsAllMock = gitlabApi.Groups.all as MockedFunction<typeof gitlabApi.Groups.all>
+      gitlabGroupsAllMock.mockResolvedValueOnce({
+        data: [{ id: rootId, full_path: 'forge' }],
+        paginationInfo: { next: null },
+      })
+
+      gitlabGroupsAllMock.mockResolvedValueOnce({
+        data: [{ id: groupId, name: subGroupPath, parent_id: rootId, full_path: `forge/${subGroupPath}` }],
+        paginationInfo: { next: null },
+      })
+
+      gitlabApi.Projects.create.mockResolvedValue(makeProjectSchema({ id: projectId, name: repoName }))
+
+      const result = await service.getOrCreateProjectGroupRepo(subGroupPath, fullPath, GITLAB_CI_CONFIG_PATH)
+
+      expect(result).toEqual(expect.objectContaining({ id: projectId }))
+      expect(gitlabApi.Projects.create).toHaveBeenCalledWith(expect.objectContaining({
+        ciConfigPath: GITLAB_CI_CONFIG_PATH,
+      }))
+    })
+
+    it('should create repo without a ciConfigPath when none is provided', async () => {
+      const subGroupPath = 'project-1'
+      const repoName = 'repo-1'
+      const fullPath = `${subGroupPath}/${repoName}`
+      const projectId = 789
+      const groupId = 456
+      const rootId = 123
+
+      const gitlabProjectsAllMock = gitlabApi.Projects.all as MockedFunction<typeof gitlabApi.Projects.all>
+      gitlabProjectsAllMock.mockResolvedValueOnce({
+        data: [],
+        paginationInfo: { next: null },
+      })
+
+      const gitlabGroupsAllMock = gitlabApi.Groups.all as MockedFunction<typeof gitlabApi.Groups.all>
+      gitlabGroupsAllMock.mockResolvedValueOnce({
+        data: [{ id: rootId, full_path: 'forge' }],
+        paginationInfo: { next: null },
+      })
+
+      gitlabGroupsAllMock.mockResolvedValueOnce({
+        data: [{ id: groupId, name: subGroupPath, parent_id: rootId, full_path: `forge/${subGroupPath}` }],
+        paginationInfo: { next: null },
+      })
+
+      gitlabApi.Projects.create.mockResolvedValue(makeProjectSchema({ id: projectId, name: repoName }))
+
+      const result = await service.getOrCreateProjectGroupRepo(subGroupPath, fullPath)
+
+      expect(result).toEqual(expect.objectContaining({ id: projectId }))
+      expect(gitlabApi.Projects.create).not.toHaveBeenCalledWith(expect.objectContaining({
+        ciConfigPath: expect.anything(),
+      }))
     })
   })
 

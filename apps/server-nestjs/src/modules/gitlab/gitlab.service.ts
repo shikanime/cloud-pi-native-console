@@ -24,6 +24,7 @@ import {
   DEFAULT_PROJECT_DEVELOPER_GROUP_PATH_SUFFIX,
   DEFAULT_PROJECT_MAINTAINER_GROUP_PATH_SUFFIX,
   DEFAULT_PROJECT_REPORTER_GROUP_PATH_SUFFIX,
+  GITLAB_CI_CONFIG_PATH,
   INFRA_APPS_REPO_NAME,
   PLUGIN_NAME,
   PROJECT_DEVELOPER_GROUP_PATH_SUFFIX_PLUGIN_KEY,
@@ -427,6 +428,8 @@ export class GitlabService {
       ?? await this.gitlab.upsertProjectGroupRepo(
         project.slug,
         repo.internalRepoName,
+        undefined,
+        repo.externalRepoUrl ? GITLAB_CI_CONFIG_PATH : undefined,
       )
   }
 
