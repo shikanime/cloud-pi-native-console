@@ -79,11 +79,30 @@ export async function capturePluginResult<P extends PluginName>(
     logger.error(`${plugin} handler failed`, error)
     return keyedBy(plugin, {
       status: 'KO',
-      message: error instanceof Error ? error.message : 'Erreur inconnue',
+      message: formatErrorMessage(error),
       executionTime: elapsedMs(),
       error,
     })
   }
+}
+
+// Plugin errors (VaultError, Keycloak admin client, …) carry actionable
+// detail (HTTP status, reasons) that Error.message alone omits. Surface it so
+// the KO message shown to the user points at the real cause.
+interface ErrorDetails {
+  status?: number
+  reasons?: string[]
+}
+
+function formatErrorMessage(error: unknown): string {
+  const base = error instanceof Error ? error.message : 'Erreur inconnue'
+  const candidate = error as Error & Partial<ErrorDetails>
+  const extras: string[] = []
+  if (typeof candidate.status === 'number') extras.push(`status=${candidate.status}`)
+  if (Array.isArray(candidate.reasons) && candidate.reasons.length) {
+    extras.push(`reasons=${candidate.reasons.join('; ')}`)
+  }
+  return extras.length ? `${base} (${extras.join(', ')})` : base
 }
 
 // TypeScript widens a computed property with a generic key to an index
