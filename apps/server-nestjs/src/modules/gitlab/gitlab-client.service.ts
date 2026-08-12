@@ -50,6 +50,30 @@ export interface OffsetPaginateOptions {
   maxPages?: number
 }
 
+interface MaybeCreateCommitOptions {
+  message: string
+  actions: CommitAction[]
+  ref?: string
+}
+
+interface GenerateCreateOrUpdateActionOptions {
+  ref: string
+  filePath: string
+  content: string
+}
+
+interface UpsertProjectGroupRepoOptions {
+  repoName: string
+  description?: string
+  ciConfigPath?: string
+}
+
+interface TriggerMirrorOptions {
+  targetRepo: string
+  syncAllBranches: boolean
+  branchName?: string
+}
+
 @Injectable()
 export class GitlabClientService {
   private readonly logger = new Logger(GitlabClientService.name)
@@ -310,12 +334,7 @@ export class GitlabClientService {
     }
   }
 
-  async maybeCreateCommit(
-    repo: CondensedProjectSchemaWith<'id'>,
-    message: string,
-    actions: CommitAction[],
-    ref: string = 'main',
-  ): Promise<void> {
+  async maybeCreateCommit(repo: CondensedProjectSchemaWith<'id'>, { message, actions, ref = 'main' }: MaybeCreateCommitOptions): Promise<void> {
     if (actions.length === 0) {
       this.logger.debug(`No GitLab commit actions to create (repoId=${repo.id}, ref=${ref})`)
       return
@@ -325,7 +344,7 @@ export class GitlabClientService {
     this.logger.verbose(`GitLab commit created (repoId=${repo.id}, ref=${ref}, actions=${actions.length})`)
   }
 
-  async generateCreateOrUpdateAction(repo: CondensedProjectSchemaWith<'id'>, ref: string, filePath: string, content: string): Promise<CommitAction | null> {
+  async generateCreateOrUpdateAction(repo: CondensedProjectSchemaWith<'id'>, { ref, filePath, content }: GenerateCreateOrUpdateActionOptions): Promise<CommitAction | null> {
     const file = await this.getFile(repo, filePath, ref)
     if (file && !hasFileContentChanged(file, content)) {
       this.logger.debug(`GitLab file is up to date; skipping commit action (repoId=${repo.id}, ref=${ref}, filePath=${filePath})`)
@@ -451,7 +470,7 @@ export class GitlabClientService {
     }
   }
 
-  async upsertProjectGroupRepo(projectSlug: string, repoName: string, description?: string, ciConfigPath?: string) {
+  async upsertProjectGroupRepo(projectSlug: string, { repoName, description, ciConfigPath }: UpsertProjectGroupRepoOptions) {
     const fullPath = `${projectSlug}/${repoName}`
     const repo = await this.getOrCreateProjectGroupRepo(projectSlug, fullPath, ciConfigPath)
     const updated = await this.client.Projects.edit(repo.id, {
@@ -497,7 +516,7 @@ export class GitlabClientService {
   }
 
   async upsertProjectMirrorRepo(projectSlug: string) {
-    return this.upsertProjectGroupRepo(projectSlug, MIRROR_REPO_NAME)
+    return this.upsertProjectGroupRepo(projectSlug, { repoName: MIRROR_REPO_NAME })
   }
 
   async getProjectToken(group: CondensedGroupSchemaWith<'id'>, projectSlug: string) {
@@ -563,7 +582,7 @@ export class GitlabClientService {
    * `SPECIAL_REPO_NAMES` are the console's own plumbing repositories — mirroring one of
    * them would have the pipeline act on itself or on the infra repo, so it is refused.
    */
-  async triggerMirror(projectSlug: string, targetRepo: string, syncAllBranches: boolean, branchName?: string) {
+  async triggerMirror(projectSlug: string, { targetRepo, syncAllBranches, branchName }: TriggerMirrorOptions) {
     if (SPECIAL_REPO_NAMES.includes(targetRepo)) {
       throw new Error('User requested for invalid mirroring')
     }
