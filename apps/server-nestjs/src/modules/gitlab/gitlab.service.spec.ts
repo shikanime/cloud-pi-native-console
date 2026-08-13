@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockDeep } from 'vitest-mock-extended'
 import { gitlabConfigFactory } from '../../config/gitlab.config'
 import { VaultClientService } from '../vault/vault-client.service'
+
 import { GitlabClientService } from './gitlab-client.service'
 import { GitlabDatastoreService } from './gitlab-datastore.service'
 import { makeAccessTokenExposedSchema, makeExpandedUserSchema, makeGroupSchema, makeMemberSchema, makePipeline, makePipelineTriggerToken, makeProjectSchema, makeProjectWithDetails } from './gitlab-testing.utils'
@@ -19,6 +20,7 @@ describe('gitlabService', () => {
   let gitlab: DeepMockProxy<GitlabClientService>
   let vault: DeepMockProxy<VaultClientService>
   let datastore: DeepMockProxy<GitlabDatastoreService>
+  let config: DeepMockProxy<ConfigType<typeof gitlabConfigFactory>>
 
   beforeEach(async () => {
     gitlab = mockDeep<GitlabClientService>()
@@ -34,7 +36,7 @@ describe('gitlabService', () => {
       readTechnReadOnlyCreds: vi.fn().mockResolvedValue(null),
       readGitlabMirrorCreds: vi.fn().mockResolvedValue(null),
     })
-    const config = mockDeep<ConfigType<typeof gitlabConfigFactory>>({ projectRootDir: 'forge' })
+    config = mockDeep<ConfigType<typeof gitlabConfigFactory>>({ projectRootDir: 'forge', url: 'https://gitlab.example.com' })
 
     const moduleRef = await Test.createTestingModule({
       providers: [
