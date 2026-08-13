@@ -5,8 +5,7 @@ import type { MockedFunction } from 'vitest'
 import type { DeepMockProxy } from 'vitest-mock-extended'
 import { Test } from '@nestjs/testing'
 import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockDeep } from 'vitest-mock-extended'
 import { gitlabConfigFactory } from '../../config/gitlab.config'
 import { GITLAB_REST_CLIENT, GitlabClientService } from './gitlab-client.service'
@@ -24,6 +23,7 @@ import {
   makeProjectSchema,
   makeRepositoryFileExpandedSchema,
   makeRepositoryTreeSchema,
+  setupMockServer,
 } from './gitlab-testing.utils'
 import {
   GITLAB_CI_CONFIG_PATH,
@@ -850,10 +850,7 @@ describe('gitlab-client', () => {
   })
 
   describe('validateProjectToken', () => {
-    const server = setupServer()
-    beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
-    afterEach(() => server.resetHandlers())
-    afterAll(() => server.close())
+    const server = setupMockServer()
 
     function stubPersonalAccessTokenSelf(body: object, status = 200) {
       server.use(

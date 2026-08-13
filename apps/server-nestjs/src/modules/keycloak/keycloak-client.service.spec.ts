@@ -4,12 +4,12 @@ import KcAdminClient from '@keycloak/keycloak-admin-client'
 import { ScheduleModule } from '@nestjs/schedule'
 import { Test } from '@nestjs/testing'
 import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockDeep } from 'vitest-mock-extended'
 import { keycloakConfigFactory } from '../../config/keycloak.config'
 import { KEYCLOAK_ADMIN_CLIENT, KeycloakClientService } from './keycloak-client.service'
 import { ADMIN_TOKEN_REFRESH_INTERVAL_MS } from './keycloak.constants'
+import { setupMockServer } from './keycloak-testing.utils'
 
 const keycloakUrl = 'https://keycloak.internal'
 const projectRealm = 'project-realm'
@@ -19,7 +19,7 @@ const projectRealm = 'project-realm'
 const tokenUrl = `${keycloakUrl}/realms/master/protocol/openid-connect/token`
 const childrenUrl = `${keycloakUrl}/admin/realms/${projectRealm}/groups/:parentId/children`
 
-const server = setupServer()
+const server = setupMockServer()
 
 function useTokenEndpoint({ rejectGrant = () => false }: { rejectGrant?: (grantType: string | null) => boolean } = {}) {
   const tokenRequests: URLSearchParams[] = []
@@ -62,7 +62,6 @@ describe('keycloakClientService authentication lifecycle', () => {
   let module: TestingModule
   let client: KcAdminClient
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
   beforeEach(async () => {
     vi.useFakeTimers()
     module = await createKeycloakClientServiceTestingModule().compile()
@@ -72,10 +71,8 @@ describe('keycloakClientService authentication lifecycle', () => {
     // close() re-runs init() on a module whose init() already failed; swallow
     // that rethrow so the "initial authentication fails" test can clean up
     await module.close().catch(() => {})
-    server.resetHandlers()
     vi.useRealTimers()
   })
-  afterAll(() => server.close())
 
   it('should authenticate with the password grant then switch to the project realm', async () => {
     const tokenRequests = useTokenEndpoint()
@@ -166,7 +163,6 @@ describe('getOrCreateSubGroupByName', () => {
   let module: TestingModule
   let service: KeycloakClientService
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
   beforeEach(async () => {
     module = await createKeycloakClientServiceTestingModule().compile()
     service = module.get(KeycloakClientService)
@@ -175,9 +171,7 @@ describe('getOrCreateSubGroupByName', () => {
   })
   afterEach(async () => {
     await module.close()
-    server.resetHandlers()
   })
-  afterAll(() => server.close())
 
   it('should return the existing subgroup without creating it', async () => {
     // No POST handler: a create attempt would fail the test

@@ -4,24 +4,22 @@ import { faker } from '@faker-js/faker'
 import { HttpStatus } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it, beforeEach } from 'vitest'
 import { mockDeep } from 'vitest-mock-extended'
 import { nexusConfigFactory } from '../../config/nexus.config'
 import { NexusClientService } from './nexus-client.service'
 import { NexusHttpClientService } from './nexus-http-client.service'
+import { setupMockServer } from './nexus-testing.utils'
 
 const nexusUrl = 'https://nexus.internal'
 
-const server = setupServer()
+const server = setupMockServer()
 const nexusAdminPassword = faker.internet.password()
 const basicAuth = `Basic ${Buffer.from(`admin:${nexusAdminPassword}`, 'utf8').toString('base64')}`
 
 describe('nexusClientService', () => {
   let service: NexusClientService
   let config: DeepMockProxy<ConfigType<typeof nexusConfigFactory>>
-
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 
   beforeEach(async () => {
     config = mockDeep<ConfigType<typeof nexusConfigFactory>>({
@@ -43,9 +41,6 @@ describe('nexusClientService', () => {
 
     service = module.get(NexusClientService)
   })
-
-  afterEach(() => server.resetHandlers())
-  afterAll(() => server.close())
 
   it('should be defined', () => {
     expect(service).toBeDefined()

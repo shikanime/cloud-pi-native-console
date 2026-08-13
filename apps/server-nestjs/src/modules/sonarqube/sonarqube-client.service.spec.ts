@@ -3,26 +3,24 @@ import type { AddPermissionGroupParams, CreateUserParams, DeactivateUserParams, 
 import { faker } from '@faker-js/faker'
 import { Test } from '@nestjs/testing'
 import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { mockDeep } from 'vitest-mock-extended'
 import { sonarqubeConfigFactory } from '../../config/sonarqube.config'
 import { getAll } from '../../utils/iterable.utils'
 import { SonarqubeClientService } from './sonarqube-client.service'
 import { SonarqubeHttpClientService } from './sonarqube-http-client.service'
-import { makeSonarqubeGeneratedToken, makeSonarqubeGroup, makeSonarqubePaging, makeSonarqubeProject, makeSonarqubeUser } from './sonarqube-testing.utils'
+import { makeSonarqubeGeneratedToken, makeSonarqubeGroup, makeSonarqubePaging, makeSonarqubeProject, makeSonarqubeUser, setupMockServer } from './sonarqube-testing.utils'
 
 const sonarUrl = 'https://sonarqube.internal'
 const sonarToken = 'my-token'
 const sonarAuthHeader = `Bearer ${sonarToken}`
 
-const server = setupServer()
+const server = setupMockServer()
 
 describe('sonarqubeClientService', () => {
   let service: SonarqubeClientService
   let config: ReturnType<typeof mockDeep<ConfigType<typeof sonarqubeConfigFactory>>>
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
   beforeEach(async () => {
     config = mockDeep<ConfigType<typeof sonarqubeConfigFactory>>({
       apiToken: sonarToken,
@@ -40,8 +38,6 @@ describe('sonarqubeClientService', () => {
 
     service = module.get(SonarqubeClientService)
   })
-  afterEach(() => server.resetHandlers())
-  afterAll(() => server.close())
 
   it('should be defined', () => {
     expect(service).toBeDefined()

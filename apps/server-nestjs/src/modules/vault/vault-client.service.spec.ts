@@ -1,20 +1,27 @@
 import type { ConfigType } from '@nestjs/config'
 import { HttpStatus } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
+import { factory, primaryKey } from '@mswjs/data'
 import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mockDeep } from 'vitest-mock-extended'
 import { baseConfigFactory } from '../../config/base.config'
 import { vaultConfigFactory } from '../../config/vault.config'
 import { VaultClientService } from './vault-client.service'
 import { VaultError, VaultHttpClientService } from './vault-http-client.service'
+import { setupMockServer } from './vault-testing.utils'
 
 const vaultUrl = 'https://vault.internal'
 
-const server = setupServer(
+const db = factory({
+  token: { id: primaryKey(() => 'created'), client_token: String },
+  secret: { path: primaryKey(String), data: Object, metadata: Object },
+})
+
+const server = setupMockServer(db,
   http.post(`${vaultUrl}/v1/auth/token/create`, () => {
-    return HttpResponse.json({ auth: { client_token: 'token' } })
+    const token = db.token.create({ client_token: 'token' })
+    return HttpResponse.json({ auth: { client_token: token.client_token } })
   }),
   http.get(`${vaultUrl}/v1/kv/data/:path`, () => {
     return HttpResponse.json({ data: { data: { secret: 'value' }, metadata: { created_time: '2023-01-01T00:00:00.000Z', version: 1 } } })
@@ -30,7 +37,6 @@ const server = setupServer(
 describe('vault', () => {
   let service: VaultClientService
 
-  beforeAll(() => server.listen())
   beforeEach(async () => {
     const config = mockDeep<ConfigType<typeof vaultConfigFactory>>({
       token: 'token',
@@ -53,8 +59,6 @@ describe('vault', () => {
 
     service = module.get(VaultClientService)
   })
-  afterEach(() => server.resetHandlers())
-  afterAll(() => server.close())
 
   describe('read', () => {
     it('should read secret', async () => {
@@ -74,6 +78,32 @@ describe('vault', () => {
 
       await expect(service.read('path')).rejects.toBeInstanceOf(VaultError)
       await expect(service.read('path')).rejects.toMatchObject({ kind: 'NotFound', status: HttpStatus.NOT_FOUND })
+    })
+  })
+
+  describe('readGitlabSecrets', () => {
+    it('reads a project group and returns raw vault data', async () => {
+      server.use(
+        http.get(`${vaultUrl}/v1/kv/data/*`, () => {
+          return HttpResponse.json({ data: { data: { key1: 'value1', key2: 42, key3: false, key4: null }, metadata: { created_time: '2023-01-01T00:00:00.000Z', version: 1 } } })
+        }),
+      )
+
+      const result = await service.readGitlabSecrets('my-project')
+
+      expect(result).toEqual({ key1: 'value1', key2: 42, key3: false, key4: null })
+    })
+
+    it('returns {} when the secret is missing', async () => {
+      server.use(
+        http.get(`${vaultUrl}/v1/kv/data/*`, () => {
+          return HttpResponse.json({}, { status: HttpStatus.NOT_FOUND })
+        }),
+      )
+
+      const result = await service.readGitlabSecrets('my-project')
+
+      expect(result).toEqual({})
     })
   })
 

@@ -3,24 +3,22 @@ import { faker } from '@faker-js/faker'
 import { HttpStatus } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it, beforeEach } from 'vitest'
 import { mockDeep } from 'vitest-mock-extended'
 import { harborConfigFactory } from '../../config/harbor.config'
 import { VaultClientService } from '../vault/vault-client.service'
 import { RegistryClientService } from './registry-client.service'
 import { RegistryHttpClientService } from './registry-http-client.service'
+import { setupMockServer } from './registry-testing.utils'
 
 const harborUrl = 'https://harbor.example'
 const harborAdminPassword = faker.internet.password()
 const basicAuth = `Basic ${Buffer.from(`admin:${harborAdminPassword}`, 'utf8').toString('base64')}`
 
-const server = setupServer()
+const server = setupMockServer()
 
 describe('registryService', () => {
   let service: RegistryClientService
-
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 
   beforeEach(async () => {
     const harborConfig = mockDeep<ConfigType<typeof harborConfigFactory>>({
@@ -49,9 +47,6 @@ describe('registryService', () => {
     }).compile()
     service = module.get(RegistryClientService)
   })
-
-  afterEach(() => server.resetHandlers())
-  afterAll(() => server.close())
 
   it('should be defined', () => {
     expect(service).toBeDefined()
