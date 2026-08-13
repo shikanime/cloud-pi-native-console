@@ -92,18 +92,19 @@ describe('observabilityService', () => {
     })
   })
 
-  describe('handleDelete', () => {
-    it('cleans up keycloak groups and values', async () => {
-      await service.handleDelete(makeProject())
-      expect(client.deleteProjectConfig).toHaveBeenCalled()
-    })
 
-    it('skips cleanup when plugin disabled', async () => {
-      const project = makeProject({
-        plugins: [{ pluginName: 'observability', key: ENABLED_PLUGIN_KEY, value: DISABLED }],
-      })
-      await service.handleDelete(project)
-      expect(client.deleteProjectConfig).not.toHaveBeenCalled()
-    })
+  describe('handleDelete', () => {
+it('cleans up keycloak groups and values', async () => {
+  await service.handleDelete(makeProject())
+  expect(client.deleteProjectConfig).toHaveBeenCalled()
+})
+
+it('skips cleanup when plugin disabled', async () => {
+  const project = makeProject({
+    plugins: [{ pluginName: 'observability', key: ENABLED_PLUGIN_KEY, value: DISABLED }],
   })
+  await service.handleDelete(project)
+  expect(client.deleteProjectConfig).not.toHaveBeenCalled()
+})
+})
 })
