@@ -51,7 +51,7 @@ describe('gitlabPluginService', () => {
       datastore.getProject.mockResolvedValue(baseProject)
       datastore.getAdminPluginConfig.mockResolvedValue(null)
       vault.readGitlabSecrets.mockResolvedValue({
-        GIT_MIRROR_PROJECT_ID: '42',
+        GIT_MIRROR_PROJECT_ID: 42,
         GIT_MIRROR_TOKEN: 'secret-token',
       })
 
@@ -67,7 +67,7 @@ describe('gitlabPluginService', () => {
       datastore.getProject.mockResolvedValue(baseProject)
       datastore.getAdminPluginConfig.mockResolvedValue('disabled')
       vault.readGitlabSecrets.mockResolvedValue({
-        GIT_MIRROR_PROJECT_ID: '42',
+        GIT_MIRROR_PROJECT_ID: 42,
         GIT_MIRROR_TOKEN: 'secret-token',
       })
 

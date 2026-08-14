@@ -183,8 +183,8 @@ describe('registryService', () => {
       await service.handleUpsert(project)
 
       expect(vault.read).toHaveBeenCalledTimes(2)
-      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/ro-robot`)
-      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/rw-robot`)
+      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/ro-robot`, expect.anything())
+      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/rw-robot`, expect.anything())
       expect(client.getProjectRobots).not.toHaveBeenCalled()
       expect(client.createRobot).not.toHaveBeenCalled()
       expect(client.deleteRobot).not.toHaveBeenCalled()
@@ -284,9 +284,9 @@ describe('registryService', () => {
       await service.handleUpsert(project)
 
       expect(client.updateQuota).toHaveBeenCalledWith(1, 1024 ** 3)
-      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/ro-robot`)
-      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/rw-robot`)
-      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/${ROBOT_NAME_PROJECT}`)
+      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/ro-robot`, expect.anything())
+      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/rw-robot`, expect.anything())
+      expect(vault.read).toHaveBeenCalledWith(`forge/${project.slug}/REGISTRY/${ROBOT_NAME_PROJECT}`, expect.anything())
     })
   })
 

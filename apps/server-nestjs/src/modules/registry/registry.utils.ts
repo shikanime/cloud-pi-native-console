@@ -1,5 +1,13 @@
 import type { ProjectWithDetails } from './registry-datastore.service'
 import { removeTrailingSlash } from '@cpn-console/shared'
+import z from 'zod'
+
+export const VaultRobotSecretSchema = z.object({
+  DOCKER_CONFIG: z.string(),
+  HOST: z.string(),
+  TOKEN: z.string(),
+  USERNAME: z.string(),
+})
 
 export function createProjectSlugCacheKey(projectId: string) {
   return `registry:project-slug:${projectId}`

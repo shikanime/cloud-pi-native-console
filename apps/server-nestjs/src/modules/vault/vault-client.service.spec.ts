@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { mockDeep } from 'vitest-mock-extended'
 import { baseConfigFactory } from '../../config/base.config'
 import { vaultConfigFactory } from '../../config/vault.config'
-import { VaultClientService } from './vault-client.service'
+import { RawSecretDataSchema, VaultClientService } from './vault-client.service'
 import { VaultError, VaultHttpClientService } from './vault-http-client.service'
 
 const vaultUrl = 'https://vault.internal'
@@ -17,7 +17,7 @@ const server = setupServer(
     return HttpResponse.json({ auth: { client_token: 'token' } })
   }),
   http.get(`${vaultUrl}/v1/kv/data/:path`, () => {
-    return HttpResponse.json({ data: { data: { secret: 'value' }, metadata: { created_time: '2023-01-01T00:00:00.000Z', version: 1 } } })
+    return HttpResponse.json({ data: { data: { secret: 'value' }, metadata: { created_time: '2023-01-01T00:00:00.000Z', custom_metadata: null, deletion_time: '', destroyed: false, version: 1 } } })
   }),
   http.post(`${vaultUrl}/v1/kv/data/:path`, () => {
     return HttpResponse.json({})
@@ -58,10 +58,10 @@ describe('vault', () => {
 
   describe('read', () => {
     it('should read secret', async () => {
-      const result = await service.read('path')
+      const result = await service.read('path', RawSecretDataSchema)
       expect(result).toEqual({
         data: { secret: 'value' },
-        metadata: { created_time: '2023-01-01T00:00:00.000Z', version: 1 },
+        metadata: { created_time: '2023-01-01T00:00:00.000Z', custom_metadata: null, deletion_time: '', destroyed: false, version: 1 },
       })
     })
 
@@ -72,22 +72,22 @@ describe('vault', () => {
         }),
       )
 
-      await expect(service.read('path')).rejects.toBeInstanceOf(VaultError)
-      await expect(service.read('path')).rejects.toMatchObject({ kind: 'NotFound', status: HttpStatus.NOT_FOUND })
+      await expect(service.read('path', RawSecretDataSchema)).rejects.toBeInstanceOf(VaultError)
+      await expect(service.read('path', RawSecretDataSchema)).rejects.toMatchObject({ kind: 'NotFound', status: HttpStatus.NOT_FOUND })
     })
   })
 
   describe('readGitlabSecrets', () => {
-    it('reads a project group and returns raw vault data', async () => {
+    it('reads a project group and validates against the group schema', async () => {
       server.use(
         http.get(`${vaultUrl}/v1/kv/data/*`, () => {
-          return HttpResponse.json({ data: { data: { key1: 'value1', key2: 42, key3: false, key4: null }, metadata: { created_time: '2023-01-01T00:00:00.000Z', version: 1 } } })
+          return HttpResponse.json({ data: { data: { PROJECT_SLUG: 'my-project', GIT_MIRROR_PROJECT_ID: 42, GIT_MIRROR_TOKEN: 'secret-token' }, metadata: { created_time: '2023-01-01T00:00:00.000Z', custom_metadata: null, deletion_time: '', destroyed: false, version: 1 } } })
         }),
       )
 
       const result = await service.readGitlabSecrets('my-project')
 
-      expect(result).toEqual({ key1: 'value1', key2: 42, key3: false, key4: null })
+      expect(result).toEqual({ PROJECT_SLUG: 'my-project', GIT_MIRROR_PROJECT_ID: 42, GIT_MIRROR_TOKEN: 'secret-token' })
     })
 
     it('returns {} when the secret is missing', async () => {

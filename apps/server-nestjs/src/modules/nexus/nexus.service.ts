@@ -13,7 +13,7 @@ import { baseConfigFactory } from '../../config/base.config'
 import { nexusConfigFactory } from '../../config/nexus.config'
 import { StartActiveSpan } from '../infrastructure/telemetry/telemetry.decorator'
 import { capturePluginResult } from '../plugin/plugin.utils'
-import { VaultClientService } from '../vault/vault-client.service'
+import { RawSecretDataSchema, VaultClientService } from '../vault/vault-client.service'
 import { VaultError } from '../vault/vault-http-client.service'
 import { NexusClientService } from './nexus-client.service'
 import { NexusDatastoreService } from './nexus-datastore.service'
@@ -435,7 +435,7 @@ export class NexusService {
     const vaultPath = generateNexusCredPath(this.baseConfig.projectsRootDir, project.slug)
     let existingPassword: string | undefined
     try {
-      existingPassword = await this.vault.read(vaultPath).then(res => res.data?.NEXUS_PASSWORD)
+      existingPassword = await this.vault.read(vaultPath, RawSecretDataSchema).then(res => res.data?.NEXUS_PASSWORD)
     } catch (error) {
       if (error instanceof VaultError && error.kind === 'NotFound') {
         existingPassword = undefined

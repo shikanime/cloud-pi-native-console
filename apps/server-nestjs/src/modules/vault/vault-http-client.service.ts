@@ -51,9 +51,10 @@ export class VaultHttpClientService {
   ) {}
 
   @StartActiveSpan()
-  async fetch<T = any>(
+  async fetch<T>(
     path: string,
     options: VaultFetchOptions = {},
+    schema: z.ZodType<T>,
   ): Promise<T | null> {
     const span = trace.getActiveSpan()
     const method = options.method ?? 'GET'
@@ -78,9 +79,23 @@ export class VaultHttpClientService {
     span?.setAttribute('vault.http.status', response.status)
     this.logger.debug(`Vault response: ${method} ${path} status=${response.status}`)
 
-    const parsed = await this.handleResponse<T>(response, method, path)
-    this.logger.verbose(`Completed Vault request: ${method} ${path} status=${response.status} outcome=${parsed === null ? 'no-content' : 'ok'}`)
-    return parsed
+    const raw = await this.handleResponse(response, method, path)
+    if (raw === null) return null
+
+    const result = schema.safeParse(raw)
+    if (!result.success) {
+      const reasons = result.error.issues.map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      this.logger.warn(`Vault response failed schema validation: ${method} ${path}\n${reasons.join('\n')}`)
+      throw new VaultError('ParseError', 'Vault response failed schema validation', {
+        status: response.status,
+        method,
+        path,
+        reasons,
+      })
+    }
+
+    this.logger.verbose(`Completed Vault request: ${method} ${path} status=${response.status} outcome=ok`)
+    return result.data
   }
 
   private get apiBaseUrl() {
@@ -97,7 +112,7 @@ export class VaultHttpClientService {
     return new Request(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
   }
 
-  private async handleResponse<T>(response: Response, method: string, path: string): Promise<T | null> {
+  private async handleResponse(response: Response, method: string, path: string): Promise<unknown | null> {
     if (response.status === HttpStatus.NO_CONTENT) return null
 
     if (!response.ok) {

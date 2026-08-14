@@ -11,7 +11,6 @@ import type {
   HarborRobotCreateRequest,
 } from './registry-client.service'
 import type { ProjectWithDetails } from './registry-datastore.service'
-import type { VaultRobotSecret } from './registry.utils'
 import { specificallyEnabled } from '@cpn-console/hooks'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
@@ -49,7 +48,7 @@ import {
   ROBOT_NAME_RO,
   ROBOT_NAME_RW,
 } from './registry.constants'
-import { generateVaultRobotSecret, getHostFromUrl, getProjectVaultPath, parseBytes } from './registry.utils'
+import { generateVaultRobotSecret, getHostFromUrl, getProjectVaultPath, parseBytes, VaultRobotSecretSchema } from './registry.utils'
 
 @Injectable()
 export class RegistryService {
@@ -105,7 +104,7 @@ export class RegistryService {
     })
     const relativeVaultPath = `REGISTRY/${robotName}`
     const vaultPath = getProjectVaultPath(project, this.baseConfig.projectsRootDir, relativeVaultPath)
-    const vaultRobotSecret = await this.vault.read<VaultRobotSecret>(vaultPath).catch((error) => {
+    const vaultRobotSecret = await this.vault.read(vaultPath, VaultRobotSecretSchema).catch((error) => {
       if (error instanceof VaultError && error.kind === 'NotFound') return null
       throw error
     })

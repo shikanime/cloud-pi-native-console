@@ -1,6 +1,7 @@
 import type { ConfigType } from '@nestjs/config'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { trace } from '@opentelemetry/api'
+import z from 'zod'
 import { baseConfigFactory } from '../../config/base.config'
 import { vaultConfigFactory } from '../../config/vault.config'
 import { StartActiveSpan } from '../infrastructure/telemetry/telemetry.decorator'
@@ -49,6 +50,74 @@ export interface VaultIdentityGroupAliasCreateRequest {
   canonical_id: string
 }
 
+export const VaultMetadataSchema = z.object({
+  created_time: z.string(),
+  custom_metadata: z.record(z.string(), z.any()).nullable().optional(),
+  deletion_time: z.string(),
+  destroyed: z.boolean(),
+  version: z.number(),
+})
+
+const VaultAuthMethodSchema = z.object({
+  accessor: z.string(),
+  type: z.string(),
+  description: z.string().optional(),
+})
+
+export function VaultSecretSchema<T extends z.ZodTypeAny>(dataSchema: T): z.ZodType<VaultSecret<z.infer<T>>> {
+  return z.object({ data: dataSchema, metadata: VaultMetadataSchema }) as z.ZodType<VaultSecret<z.infer<T>>>
+}
+
+export function VaultResponseSchema<T extends z.ZodTypeAny>(dataSchema: T): z.ZodType<VaultResponse<z.infer<T>>> {
+  return z.object({ data: VaultSecretSchema(dataSchema) }) as z.ZodType<VaultResponse<z.infer<T>>>
+}
+
+export const VaultListResponseSchema = z.object({
+  data: z.object({ keys: z.array(z.string()) }),
+})
+
+export const VaultRoleIdResponseSchema = z.object({
+  data: z.object({ role_id: z.string() }),
+})
+
+export const VaultSecretIdResponseSchema = z.object({
+  data: z.object({ secret_id: z.string() }),
+})
+
+export const VaultSysAuthResponseSchema = z.object({
+  data: z.record(z.string(), VaultAuthMethodSchema),
+})
+
+export const VaultIdentityGroupResponseSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    name: z.string(),
+    alias: z.object({ id: z.string(), name: z.string() }).partial().optional(),
+  }),
+})
+
+export const GitlabMirrorSecretSchema = z.object({
+  GIT_INPUT_URL: z.string(),
+  GIT_INPUT_USER: z.string(),
+  GIT_INPUT_PASSWORD: z.string(),
+  GIT_OUTPUT_URL: z.string(),
+  GIT_OUTPUT_USER: z.string(),
+  GIT_OUTPUT_PASSWORD: z.string(),
+}).partial()
+
+export const SonarqubeUserSecretSchema = z.object({
+  SONAR_USERNAME: z.string(),
+  SONAR_PASSWORD: z.string(),
+  SONAR_TOKEN: z.string(),
+})
+
+export const MirrorUserSecretSchema = z.object({
+  MIRROR_USER: z.string(),
+  MIRROR_TOKEN: z.string(),
+})
+
+export const RawSecretDataSchema = z.record(z.string(), z.any())
+
 export interface VaultAuthMethod {
   accessor: string
   type: string
@@ -92,12 +161,25 @@ export interface GitlabMirrorSecret {
 
 export interface GitlabMirrorGroupSecret {
   PROJECT_SLUG: string
-  GIT_MIRROR_PROJECT_ID: string
+  GIT_MIRROR_PROJECT_ID: number
   GIT_MIRROR_TOKEN: string
 }
 
+export const GitlabMirrorGroupSecretSchema = z.object({
+  PROJECT_SLUG: z.string(),
+  GIT_MIRROR_PROJECT_ID: z.number(),
+  GIT_MIRROR_TOKEN: z.string(),
+})
+
 export type RegistryGroupSecret = Record<string, string>
 export type NexusGroupSecret = Record<string, string>
+
+export const RegistryGroupSecretSchema = z.object({
+  DOCKER_CONFIG: z.string(),
+  HOST: z.string(),
+  TOKEN: z.string(),
+  USERNAME: z.string(),
+}).catchall(z.string())
 
 export interface VaultMetadata {
   created_time: string
@@ -146,12 +228,12 @@ export class VaultClientService {
   }
 
   @StartActiveSpan()
-  async getKvData<T = any>(kvName: string, path: string): Promise<VaultSecret<T>> {
+  async getKvData<T>(kvName: string, path: string, dataSchema: z.ZodType<T>): Promise<VaultSecret<T>> {
     const span = trace.getActiveSpan()
     span?.setAttribute('vault.kv.name', kvName)
     span?.setAttribute('vault.kv.path', path)
     this.logger.verbose(`Reading Vault KV data (kvName=${kvName}, path=${path})`)
-    const response = await this.http.fetch<VaultResponse<T>>(`${kvName}/data/${path}`)
+    const response = await this.http.fetch(`${kvName}/data/${path}`, {}, VaultResponseSchema(dataSchema))
     if (!response?.data) {
       throw new VaultError('InvalidResponse', 'Missing "data" field', { method: 'GET', path: `${kvName}/data/${path}` })
     }
@@ -164,33 +246,32 @@ export class VaultClientService {
     span?.setAttribute('vault.kv.name', kvName)
     span?.setAttribute('vault.kv.path', path)
     this.logger.verbose(`Writing Vault KV data (kvName=${kvName}, path=${path})`)
-    await this.http.fetch(`${kvName}/data/${path}`, { method: 'POST', body })
+    await this.http.fetch(`${kvName}/data/${path}`, { method: 'POST', body }, z.unknown())
   }
 
   @StartActiveSpan()
-  async read<T = any>(path: string): Promise<VaultSecret<T>> {
+  async read<T>(path: string, dataSchema: z.ZodType<T>): Promise<VaultSecret<T>> {
     this.logger.debug(`Reading Vault KV secret at ${path}`)
-    return await this.getKvData<T>(this.vaultConfig.kvName, path)
+    return await this.getKvData(this.vaultConfig.kvName, path, dataSchema)
+  }
+
+  private async readGroupSecrets(projectSlug: string, group: 'GITLAB' | 'REGISTRY', schema: z.ZodType<Record<string, any>>): Promise<Record<string, any>> {
+    const fullPath = generateSecretGroupPath(this.baseConfig.projectsRootDir, projectSlug, group)
+    const span = trace.getActiveSpan()
+    span?.setAttribute('project.slug', projectSlug)
+    span?.setAttribute('vault.kv.path', fullPath)
+    const secret = await this.read(fullPath, schema).catch(() => null)
+    return secret?.data ?? {}
   }
 
   @StartActiveSpan()
   async readGitlabSecrets(projectSlug: string): Promise<Record<string, any>> {
-    const fullPath = generateSecretGroupPath(this.baseConfig.projectsRootDir, projectSlug, 'GITLAB')
-    const span = trace.getActiveSpan()
-    span?.setAttribute('project.slug', projectSlug)
-    span?.setAttribute('vault.kv.path', fullPath)
-    const secret = await this.read<Record<string, any>>(fullPath).catch(() => null)
-    return secret?.data ?? {}
+    return this.readGroupSecrets(projectSlug, 'GITLAB', GitlabMirrorGroupSecretSchema)
   }
 
   @StartActiveSpan()
   async readRegistrySecrets(projectSlug: string): Promise<Record<string, any>> {
-    const fullPath = generateSecretGroupPath(this.baseConfig.projectsRootDir, projectSlug, 'REGISTRY')
-    const span = trace.getActiveSpan()
-    span?.setAttribute('project.slug', projectSlug)
-    span?.setAttribute('vault.kv.path', fullPath)
-    const secret = await this.read<Record<string, any>>(fullPath).catch(() => null)
-    return secret?.data ?? {}
+    return this.readGroupSecrets(projectSlug, 'REGISTRY', RegistryGroupSecretSchema)
   }
 
   @StartActiveSpan()
@@ -215,7 +296,7 @@ export class VaultClientService {
     span?.setAttribute('repo.name', repoName)
     span?.setAttribute('vault.kv.path', vaultCredsPath)
     this.logger.verbose(`Reading Vault GitLab mirror credentials (projectSlug=${projectSlug}, repoName=${repoName})`)
-    return await this.read<Partial<GitlabMirrorSecret>>(vaultCredsPath).catch((error) => {
+    return await this.read(vaultCredsPath, GitlabMirrorSecretSchema).catch((error) => {
       if (error instanceof VaultError && error.kind === 'NotFound') return null
       throw error
     })
@@ -252,7 +333,7 @@ export class VaultClientService {
     const span = trace.getActiveSpan()
     span?.setAttribute('project.slug', projectSlug)
     span?.setAttribute('vault.kv.path', vaultPath)
-    return await this.read(vaultPath).catch((error) => {
+    return await this.read(vaultPath, MirrorUserSecretSchema).catch((error) => {
       if (error instanceof VaultError && error.kind === 'NotFound') return null
       throw error
     })
@@ -274,7 +355,7 @@ export class VaultClientService {
     span?.setAttribute('project.slug', projectSlug)
     span?.setAttribute('vault.kv.path', vaultPath)
     this.logger.verbose(`Reading Vault SonarQube user credentials (projectSlug=${projectSlug})`)
-    return await this.read<SonarqubeUserSecret>(vaultPath).catch((error) => {
+    return await this.read(vaultPath, SonarqubeUserSecretSchema).catch((error) => {
       if (error instanceof VaultError && error.kind === 'NotFound') return null
       throw error
     })
@@ -319,7 +400,7 @@ export class VaultClientService {
     span?.setAttribute('vault.kv.name', kvName)
     span?.setAttribute('vault.kv.path', path)
     try {
-      await this.http.fetch(`${kvName}/metadata/${path}`, { method: 'DELETE' })
+      await this.http.fetch(`${kvName}/metadata/${path}`, { method: 'DELETE' }, z.unknown())
     } catch (error) {
       if (error instanceof VaultError && error.kind === 'NotFound') return
       throw error
@@ -333,7 +414,7 @@ export class VaultClientService {
       span?.setAttribute('vault.kv.name', kvName)
       span?.setAttribute('vault.kv.path', path)
       this.logger.verbose(`Listing Vault KV metadata (kvName=${kvName}, path=${path})`)
-      const response = await this.http.fetch<VaultListResponse>(`${kvName}/metadata/${path}`, { method: 'LIST' })
+      const response = await this.http.fetch(`${kvName}/metadata/${path}`, { method: 'LIST' }, VaultListResponseSchema)
       if (!response?.data?.keys) {
         throw new VaultError('InvalidResponse', 'Missing "data.keys" field', { method: 'LIST', path: `${kvName}/metadata/${path}` })
       }
@@ -347,31 +428,31 @@ export class VaultClientService {
   @StartActiveSpan()
   async upsertSysPoliciesAcl(policyName: string, body: VaultSysPoliciesAclUpsertRequest): Promise<void> {
     this.logger.verbose(`Upserting Vault ACL policy ${policyName}`)
-    await this.http.fetch(`sys/policies/acl/${policyName}`, { method: 'POST', body })
+    await this.http.fetch(`sys/policies/acl/${policyName}`, { method: 'POST', body }, z.unknown())
   }
 
   @StartActiveSpan()
   async deleteSysPoliciesAcl(policyName: string): Promise<void> {
     this.logger.verbose(`Deleting Vault ACL policy ${policyName}`)
-    await this.http.fetch(`sys/policies/acl/${policyName}`, { method: 'DELETE' })
+    await this.http.fetch(`sys/policies/acl/${policyName}`, { method: 'DELETE' }, z.unknown())
   }
 
   @StartActiveSpan()
   async createSysMount(name: string, body: VaultSysMountCreateRequest): Promise<void> {
     this.logger.verbose(`Creating Vault mount ${name} (version=${body.options.version})`)
-    await this.http.fetch(`sys/mounts/${name}`, { method: 'POST', body })
+    await this.http.fetch(`sys/mounts/${name}`, { method: 'POST', body }, z.unknown())
   }
 
   @StartActiveSpan()
   async tuneSysMount(name: string, body: VaultSysMountTuneRequest): Promise<void> {
     this.logger.verbose(`Tuning Vault mount ${name} (version=${body.options.version})`)
-    await this.http.fetch(`sys/mounts/${name}/tune`, { method: 'POST', body })
+    await this.http.fetch(`sys/mounts/${name}/tune`, { method: 'POST', body }, z.unknown())
   }
 
   @StartActiveSpan()
   async deleteSysMounts(name: string): Promise<void> {
     this.logger.verbose(`Deleting Vault mount ${name}`)
-    await this.http.fetch(`sys/mounts/${name}`, { method: 'DELETE' })
+    await this.http.fetch(`sys/mounts/${name}`, { method: 'DELETE' }, z.unknown())
   }
 
   @StartActiveSpan()
@@ -380,19 +461,19 @@ export class VaultClientService {
     await this.http.fetch(`auth/approle/role/${roleName}`, {
       method: 'POST',
       body,
-    })
+    }, z.unknown())
   }
 
   @StartActiveSpan()
   async deleteAuthApproleRole(roleName: string): Promise<void> {
     this.logger.verbose(`Deleting Vault AppRole ${roleName}`)
-    await this.http.fetch(`auth/approle/role/${roleName}`, { method: 'DELETE' })
+    await this.http.fetch(`auth/approle/role/${roleName}`, { method: 'DELETE' }, z.unknown())
   }
 
   async getAuthApproleRoleRoleId(roleName: string) {
     const path = `auth/approle/role/${roleName}/role-id`
     this.logger.verbose(`Reading Vault AppRole role-id for ${roleName}`)
-    const response = await this.http.fetch<VaultRoleIdResponse>(path)
+    const response = await this.http.fetch(path, {}, VaultRoleIdResponseSchema)
     const roleId = response?.data?.role_id
     if (!roleId) {
       throw new VaultError('InvalidResponse', `Vault role-id not found for role ${roleName}`, { method: 'GET', path })
@@ -404,7 +485,7 @@ export class VaultClientService {
   async createAuthApproleRoleSecretId(roleName: string) {
     const path = `auth/approle/role/${roleName}/secret-id`
     this.logger.verbose(`Creating Vault AppRole secret-id for ${roleName}`)
-    const response = await this.http.fetch<VaultSecretIdResponse>(path, { method: 'POST' })
+    const response = await this.http.fetch(path, { method: 'POST' }, VaultSecretIdResponseSchema)
     const secretId = response?.data?.secret_id
     if (!secretId) {
       throw new VaultError('InvalidResponse', `Vault secret-id not generated for role ${roleName}`, { method: 'POST', path })
@@ -414,7 +495,7 @@ export class VaultClientService {
 
   async getSysAuth(): Promise<Record<string, VaultAuthMethod>> {
     this.logger.verbose('Listing Vault auth methods')
-    const response = await this.http.fetch<VaultSysAuthResponse>('sys/auth')
+    const response = await this.http.fetch('sys/auth', {}, VaultSysAuthResponseSchema)
     return response?.data ?? {}
   }
 
@@ -424,7 +505,7 @@ export class VaultClientService {
     await this.http.fetch(`identity/group/name/${groupName}`, {
       method: 'POST',
       body,
-    })
+    }, z.unknown())
   }
 
   @StartActiveSpan()
@@ -432,7 +513,7 @@ export class VaultClientService {
     const span = trace.getActiveSpan()
     span?.setAttribute('vault.identity.group.name', groupName)
     const path = `identity/group/name/${groupName}`
-    const response = await this.http.fetch<VaultIdentityGroupResponse>(path)
+    const response = await this.http.fetch(path, {}, VaultIdentityGroupResponseSchema)
     if (!response) throw new VaultError('InvalidResponse', 'Empty response', { method: 'GET', path })
     return response
   }
@@ -442,7 +523,7 @@ export class VaultClientService {
     const span = trace.getActiveSpan()
     span?.setAttribute('vault.identity.group.name', groupName)
     this.logger.verbose(`Deleting Vault identity group ${groupName}`)
-    await this.http.fetch(`identity/group/name/${groupName}`, { method: 'DELETE' })
+    await this.http.fetch(`identity/group/name/${groupName}`, { method: 'DELETE' }, z.unknown())
   }
 
   @StartActiveSpan()
@@ -450,6 +531,6 @@ export class VaultClientService {
     const span = trace.getActiveSpan()
     span?.setAttribute('vault.identity.group.alias', body.name)
     this.logger.verbose(`Creating Vault identity group alias (aliasName=${body.name}, canonicalId=${body.canonical_id})`)
-    await this.http.fetch('identity/group-alias', { method: 'POST', body })
+    await this.http.fetch('identity/group-alias', { method: 'POST', body }, z.unknown())
   }
 }
