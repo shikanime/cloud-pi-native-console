@@ -13,6 +13,7 @@ import type {
   PaginationRequestOptions,
   PipelineTriggerTokenSchema,
   SimpleUserSchema,
+  VariableType,
 } from '@gitbeaker/core'
 import type { ConfigType } from '@nestjs/config'
 import { join } from 'node:path'
@@ -468,6 +469,77 @@ export class GitlabClientService {
     const fullPath = `${projectSlug}/${repoName}`
     const repo = await this.getOrCreateProjectGroupRepo(projectSlug, fullPath)
     return this.client.Projects.remove(repo.id)
+  }
+
+  // CI Variables
+  public async setGitlabGroupVariable(
+    groupId: number,
+    key: string,
+    value: string,
+    options: { masked: boolean, protected: boolean, variableType: VariableType },
+  ): Promise<'created' | 'updated' | 'already up-to-date'> {
+    const current = await this.client.GroupVariables.show(groupId, key).catch((error) => {
+      if (error instanceof GitbeakerRequestError && error.cause?.description?.includes('404')) return undefined
+      throw error
+    })
+    if (current
+      && current.masked === options.masked
+      && current.value === value
+      && current.protected === options.protected
+      && current.variable_type === options.variableType) {
+      return 'already up-to-date'
+    }
+    if (current) {
+      await this.client.GroupVariables.edit(groupId, key, value, {
+        variableType: options.variableType,
+        masked: options.masked,
+        protected: options.protected,
+        filter: { environment_scope: '*' },
+      })
+      return 'updated'
+    }
+    await this.client.GroupVariables.create(groupId, key, value, {
+      variableType: options.variableType,
+      masked: options.masked,
+      protected: options.protected,
+    })
+    return 'created'
+  }
+
+  public async setGitlabRepoVariable(
+    repoId: number,
+    key: string,
+    value: string,
+    options: { masked: boolean, protected: boolean, variableType: VariableType, environmentScope: string },
+  ): Promise<'created' | 'updated' | 'already up-to-date'> {
+    const current = await this.client.ProjectVariables.show(repoId, key, { filter: { environment_scope: options.environmentScope } }).catch((error) => {
+      if (error instanceof GitbeakerRequestError && error.cause?.description?.includes('404')) return undefined
+      throw error
+    })
+    if (current
+      && current.masked === options.masked
+      && current.value === value
+      && current.protected === options.protected
+      && current.variable_type === options.variableType) {
+      return 'already up-to-date'
+    }
+    if (current) {
+      await this.client.ProjectVariables.edit(repoId, key, value, {
+        variableType: options.variableType,
+        masked: options.masked,
+        protected: options.protected,
+        environmentScope: options.environmentScope,
+        filter: { environment_scope: options.environmentScope },
+      })
+      return 'updated'
+    }
+    await this.client.ProjectVariables.create(repoId, key, value, {
+      variableType: options.variableType,
+      masked: options.masked,
+      protected: options.protected,
+      environmentScope: options.environmentScope,
+    })
+    return 'created'
   }
 
   async commitMirror(repoId: number) {

@@ -936,4 +936,55 @@ describe('gitlab-client', () => {
       )
     })
   })
+
+  describe('CI variables', () => {
+    const groupId = 42
+    const repoId = 99
+
+    it('should create a missing group variable', async () => {
+      gitlabApi.GroupVariables.show.mockRejectedValueOnce(makeGitbeakerRequestError({ description: '404 Group variable Not Found', status: 404 }))
+
+      const result = await service.setGitlabGroupVariable(groupId, 'SONAR_TOKEN', 'secret', { masked: true, protected: false, variableType: 'env_var' })
+
+      expect(result).toBe('created')
+      expect(gitlabApi.GroupVariables.create).toHaveBeenCalledWith(groupId, 'SONAR_TOKEN', 'secret', expect.objectContaining({ masked: true, variableType: 'env_var' }))
+    })
+
+    it('should update a group variable when value differs', async () => {
+      gitlabApi.GroupVariables.show.mockResolvedValueOnce({ key: 'SONAR_TOKEN', value: 'old', variable_type: 'env_var', masked: true, protected: false })
+
+      const result = await service.setGitlabGroupVariable(groupId, 'SONAR_TOKEN', 'new', { masked: true, protected: false, variableType: 'env_var' })
+
+      expect(result).toBe('updated')
+      expect(gitlabApi.GroupVariables.edit).toHaveBeenCalledWith(groupId, 'SONAR_TOKEN', 'new', expect.objectContaining({ variableType: 'env_var' }))
+    })
+
+    it('should report up-to-date when group variable matches', async () => {
+      gitlabApi.GroupVariables.show.mockResolvedValueOnce({ key: 'SONAR_TOKEN', value: 'secret', variable_type: 'env_var', masked: true, protected: false })
+
+      const result = await service.setGitlabGroupVariable(groupId, 'SONAR_TOKEN', 'secret', { masked: true, protected: false, variableType: 'env_var' })
+
+      expect(result).toBe('already up-to-date')
+      expect(gitlabApi.GroupVariables.create).not.toHaveBeenCalled()
+      expect(gitlabApi.GroupVariables.edit).not.toHaveBeenCalled()
+    })
+
+    it('should create a missing repo variable', async () => {
+      gitlabApi.ProjectVariables.show.mockRejectedValueOnce(makeGitbeakerRequestError({ description: '404 Project variable Not Found', status: 404 }))
+
+      const result = await service.setGitlabRepoVariable(repoId, 'PROJECT_KEY', 'key', { masked: false, protected: false, variableType: 'env_var', environmentScope: '*' })
+
+      expect(result).toBe('created')
+      expect(gitlabApi.ProjectVariables.create).toHaveBeenCalledWith(repoId, 'PROJECT_KEY', 'key', expect.objectContaining({ variableType: 'env_var', environmentScope: '*' }))
+    })
+
+    it('should report up-to-date when repo variable matches', async () => {
+      gitlabApi.ProjectVariables.show.mockResolvedValueOnce({ key: 'PROJECT_KEY', value: 'key', variable_type: 'env_var', masked: false, protected: false, environment_scope: '*' })
+
+      const result = await service.setGitlabRepoVariable(repoId, 'PROJECT_KEY', 'key', { masked: false, protected: false, variableType: 'env_var', environmentScope: '*' })
+
+      expect(result).toBe('already up-to-date')
+      expect(gitlabApi.ProjectVariables.create).not.toHaveBeenCalled()
+    })
+  })
 })
