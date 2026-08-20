@@ -1,5 +1,4 @@
 import type KcAdminClient from '@keycloak/keycloak-admin-client'
-import type GroupRepresentation from '@keycloak/keycloak-admin-client/lib/defs/groupRepresentation'
 import type UserRepresentation from '@keycloak/keycloak-admin-client/lib/defs/userRepresentation'
 import type { Credentials } from '@keycloak/keycloak-admin-client/lib/utils/auth'
 import type { OnModuleInit } from '@nestjs/common'
@@ -14,7 +13,7 @@ import { keycloakConfigFactory } from '../../config/keycloak.config'
 import { getErrorResponseStatus } from '../../utils/http.utils'
 import { StartActiveSpan } from '../infrastructure/telemetry/telemetry.decorator'
 import { ADMIN_AUTH_REALM, ADMIN_TOKEN_REFRESH_INTERVAL_MS, CONSOLE_GROUP_NAME, PASSWORD_GRANT_TYPE, REFRESH_TOKEN_GRANT_TYPE, SUBGROUPS_PAGINATE_QUERY_MAX } from './keycloak.constants'
-import { joinGroupPath, splitGroupPath } from './keycloak.utils'
+import { groupSchema, splitGroupPath } from './keycloak.utils'
 
 export const KEYCLOAK_ADMIN_CLIENT = Symbol('KEYCLOAK_ADMIN_CLIENT')
 
@@ -45,17 +44,18 @@ export class KeycloakClientService implements OnModuleInit {
   }
 
   @StartActiveSpan()
-  async getGroupByName(name: string): Promise<GroupRepresentation | undefined> {
+  async getGroupByName(name: string): Promise<GroupRepresentationWith<'id' | 'name' | 'path'> | undefined> {
     const span = trace.getActiveSpan()
     span?.setAttribute('group.name', name)
     const groups = await this.client.groups.find({ search: name, briefRepresentation: false }) ?? []
-    return groups.find(g => g.name === name)
+    const parsed = groupSchema.safeParse(groups.find(g => g.name === name))
+    return parsed.success ? parsed.data : undefined
   }
 
-  async getGroupByPath(path: string): Promise<GroupRepresentation | undefined> {
+  async getGroupByPath(path: string): Promise<GroupRepresentationWith<'id' | 'name' | 'path'> | undefined> {
     const parts = splitGroupPath(path)
     this.logger.verbose(`Resolving Keycloak group path ${path} (depth=${parts.length})`)
-    let current: GroupRepresentationWith<'id'> | undefined
+    let current: GroupRepresentationWith<'id' | 'name' | 'path'> | undefined
     if (parts.length === 0) return undefined
 
     for (const name of parts) {
@@ -72,20 +72,20 @@ export class KeycloakClientService implements OnModuleInit {
     return current
   }
 
-  private async getSubGroupByName(parentId: string, name: string): Promise<GroupRepresentationWith<'id'> | undefined> {
+  private async getSubGroupByName(parentId: string, name: string): Promise<GroupRepresentationWith<'id' | 'name' | 'path'> | undefined> {
     for await (const subgroup of this.getSubGroups(parentId)) {
       if (subgroup.name === name) {
-        const parsed = z.object({ id: z.string() }).and(z.record(z.string(), z.unknown())).safeParse(subgroup)
+        const parsed = groupSchema.safeParse(subgroup)
         return parsed.success ? parsed.data : undefined
       }
     }
     return undefined
   }
 
-  private async getRootGroupByName(name: string): Promise<GroupRepresentationWith<'id'> | undefined> {
+  private async getRootGroupByName(name: string): Promise<GroupRepresentationWith<'id' | 'name' | 'path'> | undefined> {
     const candidates = await this.client.groups.find({ search: name, briefRepresentation: false }) ?? []
     const match = candidates.find(g => g.path === `/${name}`) ?? candidates.find(g => g.name === name)
-    const parsed = z.object({ id: z.string() }).and(z.record(z.string(), z.unknown())).safeParse(match)
+    const parsed = groupSchema.safeParse(match)
     return parsed.success ? parsed.data : undefined
   }
 
@@ -130,8 +130,10 @@ export class KeycloakClientService implements OnModuleInit {
     const span = trace.getActiveSpan()
     span?.setAttribute('group.name', name)
     this.logger.debug(`Creating Keycloak group ${name}`)
-    const result = await this.client.groups.create({ name })
-    return { ...result, name } as GroupRepresentation
+    await this.client.groups.create({ name })
+    const created = await this.getRootGroupByName(name)
+    if (!created) throw new Error(`Created Keycloak group ${name} but could not fetch it back`)
+    return created
   }
 
   async addUserToGroup(userId: string, groupId: string) {
@@ -178,25 +180,18 @@ export class KeycloakClientService implements OnModuleInit {
     }
 
     const parts = splitGroupPath(path)
-    let parentId: string | undefined
-    let current: GroupRepresentationWith<'id' | 'name'> | undefined
-
-    for (const name of parts.values()) {
-      if (current) {
-        if (!parentId) parentId = current.id
-        const next = z.object({ id: z.string(), name: z.string() }).safeParse(await this.getOrCreateSubGroupByName(parentId, name))
-        if (next.success) current = next.data
-      } else {
-        const next = z.object({ id: z.string(), name: z.string() }).safeParse(await this.getGroupByName(name) ?? await this.createGroup(name))
-        if (next.success) current = next.data
-      }
-      parentId = current?.id
+    if (parts.length === 0) {
+      throw new Error(`Invalid group path: "${path}"`)
     }
 
-    if (current) {
-      this.logger.log(`Created Keycloak group path ${path} (groupId=${current.id})`)
+    const [rootName, ...rest] = parts
+    let current = await this.getGroupByName(rootName) ?? await this.createGroup(rootName)
+    for (const name of rest) {
+      current = await this.getOrCreateSubGroupByName(current.id, name)
     }
-    return { ...current, path } as GroupRepresentation
+
+    this.logger.log(`Created Keycloak group path ${path} (groupId=${current.id})`)
+    return current
   }
 
   @StartActiveSpan()
@@ -209,8 +204,12 @@ export class KeycloakClientService implements OnModuleInit {
 
     this.logger.debug(`Creating Keycloak subgroup ${name} under parentId=${parentId}`)
     try {
-      const createdGroup = await this.client.groups.createChildGroup({ id: parentId }, { name })
-      return { id: createdGroup.id, name } satisfies GroupRepresentation
+      // createChildGroup only returns the new id; re-list the parent to hand
+      // back the representation Keycloak computed (name, path, subGroups...)
+      await this.client.groups.createChildGroup({ id: parentId }, { name })
+      const created = await this.findSubGroupByName(parentId, name)
+      if (!created) throw new Error(`Created Keycloak subgroup ${name} under parentId=${parentId} but could not fetch it back`)
+      return created
     } catch (err) {
       // A concurrent reconciliation may have created the subgroup between the
       // scan and the create; treat the 409 as "already exists" and re-fetch it
@@ -222,10 +221,11 @@ export class KeycloakClientService implements OnModuleInit {
     }
   }
 
-  private async findSubGroupByName(parentId: string, name: string): Promise<GroupRepresentation | undefined> {
+  private async findSubGroupByName(parentId: string, name: string): Promise<GroupRepresentationWith<'id' | 'name' | 'path'> | undefined> {
     for await (const subgroup of this.getSubGroups(parentId)) {
       if (subgroup.name === name) {
-        return subgroup
+        const parsed = groupSchema.safeParse(subgroup)
+        return parsed.success ? parsed.data : undefined
       }
     }
     return undefined
@@ -253,19 +253,13 @@ export class KeycloakClientService implements OnModuleInit {
       throw new Error(`Invalid oidcGroup for project role: "${oidcGroup}"`)
     }
 
-    let current = z.object({
-      id: z.string(),
-      name: z.string(),
-    }).parse(await this.getOrCreateSubGroupByName(consoleGroup.id, parts[0]))
+    let current = await this.getOrCreateSubGroupByName(consoleGroup.id, parts[0])
 
     for (const name of parts.slice(1)) {
-      current = z.object({
-        id: z.string(),
-        name: z.string(),
-      }).parse(await this.getOrCreateSubGroupByName(current.id, name))
+      current = await this.getOrCreateSubGroupByName(current.id, name)
     }
 
-    return { ...current, path: joinGroupPath(consoleGroup.path, ...parts) } satisfies GroupRepresentation
+    return current
   }
 
   async getOrCreateEnvironmentGroups(consoleGroup: GroupRepresentationWith<'id'>, environment: ProjectWithDetails['environments'][number]) {
@@ -275,10 +269,7 @@ export class KeycloakClientService implements OnModuleInit {
       'environment.id': environment.id,
       'environment.name': environment.name,
     })
-    const envGroup = z.object({
-      id: z.string(),
-      name: z.string(),
-    }).parse(await this.getOrCreateSubGroupByName(consoleGroup.id, environment.name))
+    const envGroup = await this.getOrCreateSubGroupByName(consoleGroup.id, environment.name)
     const [roGroup, rwGroup] = await Promise.all([
       this.getOrCreateSubGroupByName(envGroup.id, 'RO'),
       this.getOrCreateSubGroupByName(envGroup.id, 'RW'),
